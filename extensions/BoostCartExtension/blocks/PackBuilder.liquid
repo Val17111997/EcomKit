@@ -1,0 +1,730 @@
+<style>
+.pack-builder-wrapper{display:flex;gap:2rem;background:#f9f9fc;padding:1rem;border-radius:8px;font-family:'Helvetica Neue',Arial,sans-serif}
+.product-selection{flex:3;min-width:500px}
+.pack-summary{flex:1;min-width:280px;display:flex;flex-direction:column;align-items:center}
+.pack-summary h2{font-size:1.6rem;color:#000;margin-bottom:1rem}
+#pack-products-container{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1rem}
+.product-card{background:#fff;border-radius:10px;padding:1rem;text-align:center;position:relative;transition:box-shadow .3s}
+.product-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.product-card img{max-width:100%;border-radius:6px;margin-bottom:.5rem}
+.product-card p{font-weight:600;font-size:.95rem;margin:.5rem 0 .8rem 0;color:#333}
+.product-qty-badge{position:absolute;top:6px;right:6px;background:{{block.settings.cta_color|default:'#662d91'}};color:#fff;font-size:.8rem;padding:2px 6px;border-radius:12px;pointer-events:none}
+.qty-controls{display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.qty-controls .minus-btn,.qty-controls .plus-btn{background:#ddd;border:none;border-radius:4px;cursor:pointer;width:24px;height:24px;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:background-color .2s}
+.qty-controls .minus-btn:hover,.qty-controls .plus-btn:hover{background:#ccc}
+.qty-controls .qty-text{font-size:.9rem;font-weight:600;color:#333}
+.add-to-pack-button{background:{{block.settings.cta_color|default:'#662d91'}};color:#fff;border:none;padding:.6rem 1.2rem;cursor:pointer;border-radius:8px;font-size:.85rem;transition:transform .2s}
+.add-to-pack-button:hover{transform:scale(1.05)}
+#tiers-container{display:flex;gap:8px;margin-bottom:1rem;width:100%;justify-content:center}
+.tier-card{flex:1;border:2px solid #ddd;border-radius:6px;padding:1rem;text-align:center;transition:border-color .3s,background-color .3s;display:flex;flex-direction:column;align-items:center}
+.tier-card.reached{border-color:{{block.settings.cta_color|default:'#662d91'}};background:#f8f1fc}
+.tier-icon{font-size:1.4rem;margin-bottom:.5rem}
+.tier-label{font-weight:600;margin-bottom:2px}
+.tier-quantity{font-size:.9rem;color:#555}
+#selected-products{background:#fff;padding:1rem;min-height:200px;width:100%;margin-bottom:1rem;transition:box-shadow .3s}
+#selected-products:hover{box-shadow:0 4px 12px rgba(0,0,0,.03)}
+.pack-slots{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pack-slot{width:80px;height:100px;background:#fff;border:1px dashed #ccc;border-radius:8px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
+.pack-slot img{max-width:100%;max-height:100%;object-fit:cover;border-radius:6px}
+.qty-badge{position:absolute;bottom:2px;right:2px;background:{{block.settings.cta_color|default:'#662d91'}};color:#fff;font-size:.7rem;padding:2px 6px;border-radius:8px}
+.slot-placeholder{color:#ccc;font-size:.8rem}
+#add-pack-to-cart{margin-top:auto;background:{{block.settings.cta_color|default:'#662d91'}};color:#fff;border:none;padding:1rem 2rem;font-size:1.2rem;cursor:pointer;border-radius:8px;transition:transform .2s}
+#add-pack-to-cart.disabled{opacity:.5;cursor:not-allowed}
+.original-price{text-decoration:line-through;opacity:.6;margin-right:.5rem}
+.discounted-price{font-weight:bold}
+.pack-group-header{background:#f8f9fa;border-radius:6px;margin:.5rem 0}
+.pack-grouped-item{position:relative}
+@media (max-width:768px){
+.pack-builder-wrapper{flex-direction:column;gap:1.5rem;padding:.5rem}
+.product-selection{min-width:unset;order:2}
+.pack-summary{min-width:unset;order:1;width:100%}
+.pack-summary h2{font-size:1.4rem;text-align:center;margin-bottom:1.5rem}
+#pack-products-container{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.8rem}
+.product-card{padding:.8rem}
+.product-card img{margin-bottom:.8rem}
+.product-card p{font-size:.9rem;margin:.3rem 0 .6rem 0}
+.qty-controls .minus-btn,.qty-controls .plus-btn{width:32px;height:32px;font-size:1.1rem}
+.qty-controls{gap:10px}
+.add-to-pack-button{padding:.8rem 1rem;font-size:.9rem;width:100%}
+#tiers-container{flex-direction:row;gap:.4rem;margin-bottom:1.5rem}
+.tier-card{padding:.5rem;flex-direction:column;text-align:center;align-items:center;gap:.2rem;min-height:auto}
+.tier-icon{font-size:1rem;margin-bottom:.2rem}
+.tier-label{margin-bottom:.1rem;font-size:.85rem;font-weight:700}
+.tier-quantity{font-size:.7rem;line-height:1.1}
+#selected-products{padding:.8rem;min-height:150px;margin-bottom:1.5rem}
+.pack-slots{gap:6px}
+.pack-slot{width:70px;height:85px}
+.slot-placeholder{font-size:.7rem}
+.qty-badge{font-size:.65rem}
+#add-pack-to-cart{padding:1.2rem 2rem;font-size:1.1rem;width:100%;border-radius:12px}
+#free-shipping-msg{font-size:1rem;margin-top:1rem;text-align:center}
+}
+@media (max-width:480px){
+.pack-builder-wrapper{padding:.25rem;gap:1rem}
+#pack-products-container{grid-template-columns:repeat(2,1fr);gap:.6rem}
+.product-card{padding:.6rem}
+.product-card p{font-size:.85rem;line-height:1.2}
+.pack-summary h2{font-size:1.2rem}
+.tier-card{padding:.6rem;gap:.6rem}
+.tier-label{font-size:.9rem}
+.tier-quantity{font-size:.8rem}
+.pack-slot{width:60px;height:75px}
+#add-pack-to-cart{padding:1rem 1.5rem;font-size:1rem}
+#free-shipping-msg{font-size:.9rem;padding:0 .5rem}
+}
+@media (max-width:768px){
+.qty-controls .minus-btn:hover,.qty-controls .plus-btn:hover,.add-to-pack-button:hover,#add-pack-to-cart:hover{transform:none}
+.qty-controls .minus-btn,.qty-controls .plus-btn{min-height:44px;min-width:44px}
+.original-price,.discounted-price{font-size:1rem}
+.product-qty-badge{font-size:.75rem;padding:3px 8px}
+}
+/* CSS pour paliers adaptatifs */
+.pack-builder-wrapper[data-tiers="1"] #tiers-container {
+  justify-content: center;
+}
+.pack-builder-wrapper[data-tiers="1"] .tier-card {
+  max-width: 200px;
+}
+.pack-builder-wrapper[data-tiers="2"] #tiers-container {
+  justify-content: center;
+  gap: 1rem;
+}
+.pack-builder-wrapper[data-tiers="2"] .tier-card {
+  flex: 1;
+  max-width: 180px;
+}
+</style>
+
+<div class="pack-builder-wrapper" data-tiers="{{ block.settings.number_of_tiers }}">
+  <div class="product-selection">
+    <div id="pack-products-container"></div>
+  </div>
+  <div class="pack-summary">
+    <h2>{{ block.settings.pack_title }}</h2>
+<div id="tiers-container">
+      {% assign tier_count = block.settings.number_of_tiers | plus: 0 %}
+      {% if tier_count >= 1 %}
+        <div class="tier-card" id="tier1-card">
+          <div class="tier-icon" id="tier1-icon">🔒</div>
+          <div class="tier-quantity">dès {{ block.settings.tier1_threshold }} produits</div>
+        </div>
+      {% endif %}
+      
+      {% if tier_count >= 2 %}
+        <div class="tier-card" id="tier2-card">
+          <div class="tier-icon" id="tier2-icon">🔒</div>
+          <div class="tier-label">{{ block.settings.tier2_label }}</div>
+          <div class="tier-quantity">dès {{ block.settings.tier2_threshold }} produits</div>
+        </div>
+      {% endif %}
+      
+      {% if tier_count >= 3 %}
+        <div class="tier-card" id="tier3-card">
+          <div class="tier-icon" id="tier3-icon">🔒</div>
+          <div class="tier-label">{{ block.settings.tier3_label }}</div>
+          <div class="tier-quantity">dès {{ block.settings.tier3_threshold }} produits</div>
+        </div>
+      {% endif %}
+    </div>
+    <div id="selected-products">
+      <div class="pack-slots" id="pack-slots"></div>
+    </div>
+    <button id="add-pack-to-cart" class="disabled">Ajouter</button>
+    <div id="free-shipping-msg" style="margin-top:0.5rem;text-align:center;font-size:1.2rem;color:#333;"></div>
+  </div>
+</div>
+
+<script>
+window.__packProducts=[{% for product in block.settings.pack_products %}{variantId:{{ product.variants.first.id }},title:"{{ product.title | escape }}",image:"{{ product.featured_image | image_url: width:250 }}",price:{{ product.variants.first.price | json }}}{% unless forloop.last %},{% endunless %}{% endfor %}];
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const drawerSels = ['cart-drawer', '[data-action="toggle-cart-drawer"]', '[aria-controls="CartDrawer"]', '[data-cart-toggle]', '.header__icon--cart'];
+  const hasDrawer = drawerSels.some(sel => !!document.querySelector(sel));
+
+  function openDrawer() {
+    try {
+      const d = document.querySelector('cart-drawer');
+      if (d?.open) {
+        d.open();
+        return Promise.resolve();
+      }
+      
+      for (const sel of drawerSels.slice(1)) {
+        const btn = document.querySelector(sel);
+        if (btn) {
+          btn.click();
+          return Promise.resolve();
+        }
+      }
+      return Promise.resolve();
+    } catch (error) {
+      console.warn('Erreur ouverture drawer:', error);
+      return Promise.resolve();
+    }
+  }
+
+  function refreshDrawer() {
+    return fetch(`${window.Shopify.routes.root}?section_id=cart-drawer`)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.text();
+      })
+      .then(html => {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const newDrw = doc.querySelector('cart-drawer');
+        const curr = document.querySelector('cart-drawer');
+        
+        if (newDrw && curr) {
+          curr.innerHTML = newDrw.innerHTML;
+          curr.className = newDrw.className;
+        }
+        
+        return new Promise(resolve => {
+          setTimeout(() => {
+            groupPackItems();
+            resolve();
+          }, 150);
+        });
+      })
+      .catch(error => {
+        console.warn('Erreur refresh drawer:', error);
+        return Promise.resolve();
+      });
+  }
+
+  function groupPackItems() {
+    try {
+      const items = document.querySelectorAll('.cart-item,.cart__row,.cart-drawer__item');
+      const packs = new Map();
+      
+      items.forEach(item => {
+        const text = item.textContent || item.innerText || '';
+        const idMatch = text.match(/__pack_id:([^,\s]+)/);
+        const nameMatch = text.match(/__pack_name:([^,\s]+)/);
+        
+        if (idMatch && nameMatch) {
+          const id = idMatch[1];
+          const name = decodeURIComponent(nameMatch[1]);
+          
+          if (!packs.has(id)) {
+            packs.set(id, { name: name, items: [], groupContainer: null });
+          }
+          packs.get(id).items.push(item);
+        }
+      });
+
+      packs.forEach((pack, packId) => {
+        if (pack.items.length > 1) {
+          const first = pack.items[0];
+          const existing = first.parentNode?.querySelector(`[data-pack-id="${packId}"]`);
+          
+          if (existing) return;
+
+          const header = document.createElement('div');
+          header.className = 'pack-group-header';
+          header.setAttribute('data-pack-id', packId);
+          header.innerHTML = `<div style="display:flex;align-items:center;gap:1rem;padding:0.5rem 0;border-bottom:1px solid #e0e0e0;margin-bottom:0.5rem;"><span style="font-weight:600;color:#333;">📦 ${pack.name}</span><span style="font-size:0.9rem;color:#666;">${pack.items.length} produits</span></div>`;
+          
+          first.parentNode?.insertBefore(header, first);
+          
+          pack.items.forEach(item => {
+            item.classList.add('pack-grouped-item');
+            item.style.marginLeft = '1rem';
+            item.style.borderLeft = '3px solid #f0f0f0';
+            item.style.paddingLeft = '1rem';
+          });
+        }
+      });
+    } catch (error) {
+      console.warn('Erreur groupage items:', error);
+    }
+  }
+
+  function hideProps() {
+    try {
+      document.querySelectorAll('.cart-item,.cart__row,.cart-drawer__item').forEach(item => {
+        const props = item.querySelectorAll('[class*="property"],.cart-item__property,.product-option');
+        props.forEach(prop => {
+          if (prop.textContent.includes('__pack_') && !prop.textContent.includes('Pack:')) {
+            prop.style.display = 'none';
+          }
+        });
+      });
+    } catch (error) {
+      console.warn('Erreur masquage propriétés:', error);
+    }
+  }
+
+  const observer = new MutationObserver(() => {
+    hideProps();
+    groupPackItems();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  hideProps();
+  groupPackItems();
+
+  const container = document.getElementById('pack-products-container');
+  const slots = document.getElementById('pack-slots');
+  const addBtn = document.getElementById('add-pack-to-cart');
+  
+const numberOfTiers = parseInt({{ block.settings.number_of_tiers | json }}) || 3;  const t1 = {{ block.settings.tier1_threshold }};
+  const t2 = numberOfTiers >= 2 ? {{ block.settings.tier2_threshold }} : 999999;
+  const t3 = numberOfTiers >= 3 ? {{ block.settings.tier3_threshold }} : 999999;
+  const freeShip = {{ block.settings.free_shipping_threshold }} * 100;
+  
+  const tier1Card = document.getElementById('tier1-card');
+  const tier2Card = numberOfTiers >= 2 ? document.getElementById('tier2-card') : null;
+  const tier3Card = numberOfTiers >= 3 ? document.getElementById('tier3-card') : null;
+  const tier1Icon = document.getElementById('tier1-icon');
+  const tier2Icon = numberOfTiers >= 2 ? document.getElementById('tier2-icon') : null;
+  const tier3Icon = numberOfTiers >= 3 ? document.getElementById('tier3-icon') : null;
+  
+  const MAX_SLOTS = window.__packProducts.length;
+  const selected = {};
+  // Clé unique pour ce pack spécifique (basée sur les produits disponibles)
+const STORAGE_KEY = `pack_selection_${window.__packProducts.map(p => p.variantId).join('_')}`;
+
+// Sauvegarder la sélection dans localStorage
+function saveSelection() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(selected));
+  } catch (error) {
+    console.warn('Impossible de sauvegarder la sélection:', error);
+  }
+}
+
+// Charger la sélection depuis localStorage
+function loadSelection() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsedSelection = JSON.parse(saved);
+      // Vérifier que les produits sauvegardés existent toujours
+      Object.keys(parsedSelection).forEach(variantId => {
+        const productExists = window.__packProducts.some(p => p.variantId.toString() === variantId);
+        if (productExists) {
+          selected[variantId] = parsedSelection[variantId];
+        }
+      });
+      console.log('Sélection restaurée depuis la sauvegarde');
+    }
+  } catch (error) {
+    console.warn('Impossible de charger la sélection sauvegardée:', error);
+  }
+}
+
+// Nettoyer la sélection sauvegardée
+function clearSavedSelection() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn('Impossible de nettoyer la sélection:', error);
+  }
+}
+
+  function formatMoney(cents) {
+    return (cents / 100).toFixed(2).replace('.', ',') + ' €';
+  }
+
+  function getTotalQty() {
+    return Object.values(selected).reduce((sum, p) => sum + p.quantity, 0);
+  }
+
+  function getTotalPrice() {
+    return Object.values(selected).reduce((sum, p) => sum + p.quantity * p.price, 0);
+  }
+
+  function updateShipping() {
+    const msg = document.getElementById('free-shipping-msg');
+    const total = getTotalPrice();
+    
+    if (total < freeShip) {
+      const missing = freeShip - total;
+      msg.textContent = `Plus que ${formatMoney(missing)} pour profiter de la livraison offerte 📦`;
+    } else {
+      msg.textContent = 'Livraison offerte 🎉';
+    }
+  }
+
+function updateTiers() {
+    const qty = getTotalQty();
+    const total = getTotalPrice();
+    
+    // Mise à jour du tier 1 (toujours présent)
+    const tier1Reached = qty >= t1;
+    tier1Card.classList.toggle('reached', tier1Reached);
+    tier1Icon.textContent = tier1Reached ? '🎉' : '🔒';
+    
+    // Mise à jour du tier 2 (si activé)
+    if (numberOfTiers >= 2 && tier2Card && tier2Icon) {
+      const tier2Reached = qty >= t2;
+      tier2Card.classList.toggle('reached', tier2Reached);
+      tier2Icon.textContent = tier2Reached ? '🎉' : '🔒';
+    }
+    
+    // Mise à jour du tier 3 (si activé)
+    if (numberOfTiers >= 3 && tier3Card && tier3Icon) {
+      const tier3Reached = qty >= t3;
+      tier3Card.classList.toggle('reached', tier3Reached);
+      tier3Icon.textContent = tier3Reached ? '🎉' : '🔒';
+    }
+
+    addBtn.disabled = qty < t1;
+    addBtn.classList.toggle('disabled', qty < t1);
+
+    const pct2 = parseFloat("{{ block.settings.tier2_label }}".replace('%', '')) || 0;
+    const pct3 = parseFloat("{{ block.settings.tier3_label }}".replace('%', '')) || 0;
+
+    let discountPct = 0;
+  if (numberOfTiers >= 3 && qty >= t3 && pct3 > 0) {
+      discountPct = pct3;
+    } else if (numberOfTiers >= 2 && qty >= t2 && pct2 > 0) {
+      discountPct = pct2;
+    }
+
+    if (total > 0) {
+      if (discountPct > 0) {
+        const discounted = Math.round(total * (100 - discountPct) / 100);
+        addBtn.innerHTML = `Ajouter – <span class="original-price">${formatMoney(total)}</span><span class="discounted-price">${formatMoney(discounted)}</span>`;
+      } else {
+        addBtn.textContent = `Ajouter – ${formatMoney(total)}`;
+      }
+    } else {
+      addBtn.textContent = 'Ajouter';
+    }
+
+    updateShipping();
+  }
+
+  function renderProducts() {
+    container.innerHTML = '';
+    
+    window.__packProducts.forEach(prod => {
+      const qty = selected[prod.variantId]?.quantity || 0;
+      const card = document.createElement('div');
+      card.className = 'product-card';
+      
+      card.innerHTML = `
+        ${qty ? `<div class="product-qty-badge">x${qty}</div>` : ''}
+        <img src="${prod.image}" alt="${prod.title}">
+        <p>${prod.title}</p>
+        ${qty ? `
+          <div class="qty-controls">
+            <button class="minus-btn" data-id="${prod.variantId}">−</button>
+            <span class="qty-text">${qty}</span>
+            <button class="plus-btn" data-id="${prod.variantId}">+</button>
+          </div>
+        ` : `
+          <button class="add-to-pack-button" data-id="${prod.variantId}" data-title="${prod.title}" data-image="${prod.image}" data-price="${prod.price}">Ajouter</button>
+        `}
+      `;
+      
+      container.appendChild(card);
+    });
+
+    container.querySelectorAll('.add-to-pack-button').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.id;
+        selected[id] = selected[id] || {
+          handle: btn.dataset.title,
+          image: btn.dataset.image,
+          price: +btn.dataset.price,
+          quantity: 0
+        };
+        selected[id].quantity++;
+        saveSelection();
+        renderProducts();
+        renderSlots();
+        updateTiers();
+      };
+    });
+
+    container.querySelectorAll('.minus-btn').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.id;
+        if (--selected[id].quantity <= 0) delete selected[id];
+        saveSelection();
+        renderProducts();
+        renderSlots();
+        updateTiers();
+      };
+    });
+
+    container.querySelectorAll('.plus-btn').forEach(btn => {
+      btn.onclick = () => {
+        selected[btn.dataset.id].quantity++;
+        saveSelection();
+        renderProducts();
+        renderSlots();
+        updateTiers();
+      };
+    });
+  }
+
+  function renderSlots() {
+    slots.innerHTML = '';
+    const items = Object.values(selected);
+    
+    for (let i = 0; i < MAX_SLOTS; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'pack-slot';
+      
+      if (items[i]) {
+        slot.innerHTML = `<img src="${items[i].image}" alt="${items[i].handle}"><div class="qty-badge">x${items[i].quantity}</div>`;
+      } else {
+        slot.innerHTML = '<div class="slot-placeholder">Vide</div>';
+      }
+      
+      slots.appendChild(slot);
+    }
+  }
+
+addBtn.onclick = async () => {
+  if (addBtn.disabled) return;
+
+  const originalText = addBtn.textContent;
+  addBtn.disabled = true;
+  addBtn.textContent = 'Ajout en cours...';
+
+  try {
+    if (Object.keys(selected).length === 0) {
+      throw new Error('Aucun produit sélectionné');
+    }
+
+    const packId = Date.now().toString();
+    const packName = encodeURIComponent("{{ block.settings.pack_title }}");
+    const productList = Object.values(selected).map(p => `${p.handle} (${p.quantity})`).join(', ');
+
+    const itemsToAdd = Object.entries(selected).map(([id, p]) => ({
+      id: parseInt(id, 10),
+      quantity: p.quantity,
+      properties: {
+        '__pack_id': packId,
+        '__pack_name': packName,
+        '__pack_products': productList,
+        'Pack': "{{ block.settings.pack_title }}"
+      }
+    }));
+
+    const requestData = { items: itemsToAdd };
+
+    let response;
+    try {
+      response = await fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+    } catch (fetchError) {
+      throw new Error('Problème de connexion réseau');
+    }
+
+    if (!response) {
+      throw new Error('Aucune réponse du serveur');
+    }
+
+    const status = response.status || 'inconnu';
+    const ok = response.ok !== undefined ? response.ok : (status >= 200 && status < 300);
+
+    if (!ok && status !== 'inconnu') {
+      try {
+        const errorText = await response.text();
+        throw new Error(`Erreur serveur (${status}): ${errorText}`);
+      } catch (e) {
+        throw new Error(`Erreur serveur (${status})`);
+      }
+    }
+
+    // Essayer de lire la réponse
+    try {
+      const responseText = await response.text();
+      if (responseText) {
+        JSON.parse(responseText);
+      }
+    } catch (parseError) {
+      // Continuer même si on ne peut pas parser la réponse
+    }
+
+    // Réinitialiser la sélection
+    clearSavedSelection();
+    Object.keys(selected).forEach(k => delete selected[k]);
+    renderProducts();
+    renderSlots();
+    updateTiers();
+
+    // Gérer l'ouverture du drawer/panier
+    if (hasDrawer) {
+      try {
+        await refreshDrawer();
+        setTimeout(() => openDrawer(), 300);
+      } catch (drawerError) {
+        window.location.href = '/cart';
+      }
+    } else {
+      window.location.href = '/cart';
+    }
+
+  } catch (error) {
+    let userMessage = "Une erreur s'est produite lors de l'ajout du pack.";
+    if (error.message.includes('connexion') || error.message.includes('réseau')) {
+      userMessage = "Problème de connexion. Vérifiez votre réseau et réessayez.";
+    } else if (error.message.includes('serveur')) {
+      userMessage = "Erreur du serveur. Veuillez réessayer dans quelques instants.";
+    } else if (error.message.includes('produit')) {
+      userMessage = "Problème avec la sélection de produits. Veuillez rafraîchir la page.";
+    }
+    
+    alert(userMessage);
+    
+  } finally {
+    addBtn.disabled = false;
+    addBtn.textContent = originalText;
+  }
+};
+  function enhanceMobile() {
+    document.querySelectorAll('.add-to-pack-button,.minus-btn,.plus-btn,#add-pack-to-cart').forEach(btn => {
+      btn.addEventListener('touchstart', function() {
+        this.style.transform = 'scale(0.95)';
+      });
+      btn.addEventListener('touchend', function() {
+        this.style.transform = '';
+      });
+    });
+
+    if (window.innerWidth <= 768) {
+      const observer = new MutationObserver(() => {
+        const summary = document.querySelector('.pack-summary');
+        if (summary && getTotalQty() > 0) {
+          summary.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+
+      const slotsContainer = document.getElementById('pack-slots');
+      if (slotsContainer) {
+        observer.observe(slotsContainer, { childList: true, subtree: true });
+      }
+    }
+  }
+
+loadSelection(); // 🔄 Charger AVANT de faire le rendu
+renderProducts();
+renderSlots();
+updateTiers();
+enhanceMobile();
+
+  const originalRender = renderProducts;
+  renderProducts = function() {
+    originalRender();
+    enhanceMobile();
+  };
+});
+</script>
+
+{% schema %}
+{
+  "name": "PackBuilder",
+  "target": "section",
+  "settings": [
+    {
+      "type": "product_list",
+      "id": "pack_products",
+      "label": "Sélectionnez vos produits pour le pack",
+      "limit": 10
+    },
+    {
+      "type": "text",
+      "id": "pack_title",
+      "label": "Titre du pack",
+      "default": "Votre pack découverte"
+    },
+    {
+      "type": "color",
+      "id": "cta_color",
+      "label": "Couleur du CTA",
+      "default": "#662d91"
+    },
+{
+      "type": "header",
+      "content": "Configuration des paliers"
+    },
+    {
+      "type": "select",
+      "id": "number_of_tiers",
+      "label": "Nombre de paliers",
+      "options": [
+        {
+          "value": "1",
+          "label": "1 palier"
+        },
+        {
+          "value": "2",
+          "label": "2 paliers"
+        },
+        {
+          "value": "3",
+          "label": "3 paliers"
+        }
+      ],
+      "default": "3"
+    },
+    {
+      "type": "header",
+      "content": "Paliers & Quantités"
+    },
+    {
+      "type": "number",
+      "id": "tier1_threshold",
+      "label": "Quantité palier 1",
+      "default": 3
+    },
+    {
+      "type": "number",
+      "id": "tier2_threshold",
+      "label": "Quantité palier 2",
+      "default": 8
+    },
+    {
+      "type": "number",
+      "id": "tier3_threshold",
+      "label": "Quantité palier 3",
+      "default": 16
+    },
+    {
+      "type": "header",
+      "content": "Labels"
+    },
+    {
+      "type": "text",
+      "id": "tier2_label",
+      "label": "Label palier 2",
+      "default": "10%"
+    },
+    {
+      "type": "text",
+      "id": "tier3_label",
+      "label": "Label palier 3",
+      "default": "20%"
+    },
+    {
+      "type": "header",
+      "content": "ℹ️ Information"
+    },
+    {
+      "type": "paragraph",
+      "content": "Le paramétrage des codes promos se gère directement dans la partie \"Réductions\" sur Shopify. Créez vos codes de réduction là-bas et ils s'appliqueront dans le pack."
+    },
+    {
+      "type": "number",
+      "id": "free_shipping_threshold",
+      "label": "Montant minimum pour livraison offerte (€)",
+      "default": 50
+    }
+  ]
+}
+{% endschema %}

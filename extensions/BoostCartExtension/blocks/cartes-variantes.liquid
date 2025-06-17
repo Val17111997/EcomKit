@@ -1,0 +1,235 @@
+{% comment %}
+  blocks/cartes-variantes.liquid
+  – Affiche chaque variante du produit sélectionné sous forme de cartes
+  – Permet de sélectionner une variante et de synchroniser la sélection avec le bouton natif du thème
+  – Permet de définir un titre, un badge, et un texte de livraison custom par variante via 3 settings chacun
+  – Permet de choisir la variante active par défaut
+  – Badge repositionné en haut à droite de l'image produit
+  – Affiche le prix barré si compare_at_price > price
+{% endcomment %}
+
+{% if block.settings.pack_product %}
+  {% assign product        = all_products[block.settings.pack_product] %}
+  {% assign default_index  = block.settings.default_variant_index | default: 1 | plus: 0 %}
+
+  <div id="bundle-{{ section.id }}" class="bundle-section">
+    <div class="bundle-cards" id="bundle-cards-{{ section.id }}">
+      {% for variant in product.variants %}
+        {% assign i = forloop.index %}
+        {%- case i -%}
+          {%- when 1 -%}
+            {% assign title_text    = block.settings.pack_title_1 %}
+            {% assign badge_text    = block.settings.pack_badge_1 %}
+            {% assign shipping_text = block.settings.shipping_text_1 %}
+          {%- when 2 -%}
+            {% assign title_text    = block.settings.pack_title_2 %}
+            {% assign badge_text    = block.settings.pack_badge_2 %}
+            {% assign shipping_text = block.settings.shipping_text_2 %}
+          {%- when 3 -%}
+            {% assign title_text    = block.settings.pack_title_3 %}
+            {% assign badge_text    = block.settings.pack_badge_3 %}
+            {% assign shipping_text = block.settings.shipping_text_3 %}
+        {%- endcase -%}
+
+        <div
+          class="bundle-card{% if i == default_index %} active{% endif %} bundle-card--{{ i }}"
+          data-variant-id="{{ variant.id }}"
+          tabindex="0"
+          role="button"
+          aria-pressed="false"
+        >
+          <div class="bundle-card__header">
+            <span class="bundle-card__tag">{{ title_text }}</span>
+          </div>
+
+          <div class="bundle-card__image">
+            <img
+              src="{{ variant.featured_image | img_url: '400x' }}"
+              alt="{{ product.title }} – {{ variant.title }}"
+            />
+            {% if badge_text != blank %}
+              <span class="bundle-card__badge image-badge">{{ badge_text }}</span>
+            {% endif %}
+          </div>
+
+          <h3 class="bundle-card__title">{{ variant.title }}</h3>
+
+          {% assign weight = variant.metafields.custom.weight %}
+          {% assign doses  = variant.metafields.custom.doses %}
+          {% if weight or doses %}
+            <p class="bundle-card__meta">
+              {% if weight %}{{ weight }}{% endif %}
+              {% if weight and doses %} | {% endif %}
+              {% if doses %}{{ doses }} doses{% endif %}
+            </p>
+          {% endif %}
+
+          <p class="bundle-card__price">
+            {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
+              <span class="bundle-card__compare">{{ variant.compare_at_price | money }}</span>
+            {% endif %}
+            {{ variant.price | money }}
+          </p>
+
+          {% if doses %}
+            <p class="bundle-card__unit">
+              soit {{ variant.price | divided_by: doses | money }} par dose
+            </p>
+          {% endif %}
+
+          <p class="bundle-card__shipping">{{ shipping_text }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const wrapper = document.getElementById("bundle-{{ section.id }}");
+      if (!wrapper) return;
+
+      const cards = Array.from(wrapper.querySelectorAll(".bundle-card"));
+      const themeInputs = document.querySelectorAll('form[action^="/cart/add"] input[name="id"]');
+
+      function notifyTheme(variantId) {
+        themeInputs.forEach(input => {
+          input.value = variantId;
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        document.dispatchEvent(new CustomEvent("variant:change", {
+          bubbles: true,
+          detail: { id: Number(variantId) }
+        }));
+      }
+
+      cards.forEach((card, idx) => {
+        card.addEventListener("click", () => {
+          const vid = card.dataset.variantId;
+          cards.forEach(c => c.classList.remove("active"));
+          card.classList.add("active");
+          notifyTheme(vid);
+        });
+        if (idx + 1 === {{ default_index }}) {
+          const vid = card.dataset.variantId;
+          cards.forEach(c => c.classList.remove("active"));
+          cards[idx].classList.add("active");
+          notifyTheme(vid);
+        }
+      });
+    });
+  </script>
+
+  <style>
+    .bundle-cards {
+      display: grid;
+      grid-template-columns: repeat({{ product.variants.size }}, minmax(0, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    .bundle-card {
+      position: relative;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      cursor: pointer;
+      transition: border-color .2s, box-shadow .2s, background-color .2s;
+      outline: none;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .bundle-card:hover,
+    .bundle-card:focus-visible {
+      border-color: #aaa;
+      box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    }
+    .bundle-card.active {
+      background-color: {{ block.settings.cta_color }}20;
+      border-color: {{ block.settings.cta_color }};
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    }
+    .bundle-card--popular:not(.active) {
+      border-color: #ddd;
+      box-shadow: none;
+    }
+
+    .bundle-card__header {
+      margin-bottom: .5rem;
+    }
+    .bundle-card__tag {
+      font-weight: 600;
+      display: block;
+    }
+    .bundle-card__image {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .bundle-card__badge.image-badge {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background-color: {{ block.settings.badge_color }};
+      color: #fff;
+      padding: .3rem .6rem;
+      border-radius: 4px;
+      font-size: .85rem;
+      font-weight: 600;
+      z-index: 1;
+    }
+    .bundle-card__image img {
+      max-width: 100%;
+      display: block;
+      margin: 0 auto;
+    }
+    .bundle-card__title {
+      font-size: 1.25rem;
+      margin: .75rem 0 .5rem;
+    }
+    .bundle-card__meta,
+    .bundle-card__unit,
+    .bundle-card__shipping {
+      font-size: .9rem;
+      margin: .2rem 0;
+      color: #555;
+    }
+    .bundle-card__price {
+      font-size: 1.5rem;
+      margin: .3rem 0;
+    }
+    .bundle-card__compare {
+      text-decoration: line-through;
+      color: #888;
+      margin-right: .5rem;
+    }
+  </style>
+
+{% else %}
+  <p class="bundle-error">
+    Veuillez sélectionner un produit “Pack découverte” dans les réglages !
+  </p>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Pack découverte en cartes",
+  "target": "section",
+  "settings": [
+    { "type": "product", "id": "pack_product",         "label": "Produit principal (pack découverte)" },
+    { "type": "number",  "id": "default_variant_index", "label": "Variante sélectionnée par défaut (index)", "default": 1 },
+    { "type": "number",  "id": "popular_variant_index","label": "Index de la carte Populaire",      "default": 2 },
+    { "type": "color",   "id": "cta_color",            "label": "Couleur principale (bords & survol)", "default": "#000000" },
+    { "type": "color",   "id": "badge_color",          "label": "Couleur des badges",              "default": "#000000" },
+    { "type": "text",    "id": "pack_title_1",         "label": "Titre Pack 1",                 "default": "Pack 1" },
+    { "type": "text",    "id": "pack_title_2",         "label": "Titre Pack 2",                 "default": "Pack 2" },
+    { "type": "text",    "id": "pack_title_3",         "label": "Titre Pack 3",                 "default": "Pack 3" },
+    { "type": "text",    "id": "pack_badge_1",         "label": "Badge variante 1",             "default": "-" },
+    { "type": "text",    "id": "pack_badge_2",         "label": "Badge variante 2",             "default": "-" },
+    { "type": "text",    "id": "pack_badge_3",         "label": "Badge variante 3",             "default": "-" },
+    { "type": "text",    "id": "shipping_text_1",      "label": "Badge livraison variante 1",  "default": "✓ Livraison offerte" },
+    { "type": "text",    "id": "shipping_text_2",      "label": "Badge livraison variante 2",  "default": "✓ Livraison offerte" },
+    { "type": "text",    "id": "shipping_text_3",      "label": "Badge livraison variante 3",  "default": "✓ Livraison offerte" }
+  ]
+}
+{% endschema %}

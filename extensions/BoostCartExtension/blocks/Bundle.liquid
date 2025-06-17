@@ -1,0 +1,269 @@
+{% if block.settings.pack_product %}
+{% assign product = all_products[block.settings.pack_product] %}
+{% if product and product.variants.size > 0 %}
+{% assign variant_count = product.variants.size %}
+<div id="bundle-toast-container" class="bundle-toast-container"></div>
+<div id="bundle-form" class="bundle-form">
+<input type="hidden" name="id" value="{{ product.variants.first.id }}">
+<div class="bundle-options">
+<h2 class="bundle-title">{{ block.settings.bundle_heading }}</h2>
+{% for i in (1..product.variants.size) %}
+<div class="bundle-slot" data-slot="{{ i }}">
+<div class="bundle-slot-header">
+<label for="slot-{{ i }}">{{ block.settings.variant_title }} {{ i }}</label>
+<div class="bundle-slot-status"><span class="bundle-checkmark">✓</span></div>
+</div>
+<div class="bundle-buttons" data-slot-index="{{ i }}">
+{% for variant in product.variants %}
+<button type="button" class="bundle-option-button" data-variant-id="{{ variant.id }}">{{ variant.title }}</button>
+{% endfor %}
+<input type="hidden" name="variant_{{ i }}" class="bundle-hidden-input" value="">
+</div>
+</div>
+{% endfor %}
+</div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+const packVariantId={{ product.variants.first.id }};
+const variantTitle="{{ block.settings.variant_title | escape }}";
+const validationMessage="{{ block.settings.validation_message | escape }}";
+const variantCount={{ product.variants.size }};
+function showToast(message,type='info'){
+const container=document.getElementById('bundle-toast-container');
+const toast=document.createElement('div');
+toast.className=`bundle-toast bundle-toast-${type}`;
+toast.innerHTML=`<span class="toast-message">${message}</span><button class="toast-close">&times;</button>`;
+container.appendChild(toast);
+setTimeout(()=>toast.classList.add('show'),100);
+setTimeout(()=>removeToast(toast),4000);
+toast.querySelector('.toast-close').addEventListener('click',()=>removeToast(toast));
+}
+function removeToast(toast){
+toast.classList.remove('show');
+setTimeout(()=>toast.remove(),300);
+}
+function updateSlotStatus(slotElement,isSelected){
+if(isSelected){
+slotElement.classList.add('bundle-slot-completed');
+slotElement.classList.remove('bundle-slot-empty');
+}else{
+slotElement.classList.remove('bundle-slot-completed');
+slotElement.classList.add('bundle-slot-empty');
+}
+}
+function setButtonLoading(button,loading){
+if(loading){
+button.classList.add('loading');
+button.setAttribute('data-original-text',button.textContent);
+button.innerHTML='<span class="spinner"></span> Ajout en cours...';
+button.disabled=true;
+}else{
+button.classList.remove('loading');
+button.textContent=button.getAttribute('data-original-text')||'Ajouter au panier';
+button.disabled=false;
+}
+}
+const drawerTriggers=['[data-action="toggle-cart-drawer"]','[aria-controls="CartDrawer"]','[data-cart-toggle]','.header__icon--cart'];
+function openCartDrawer(){
+const drawerEl=document.querySelector('cart-drawer');
+if(drawerEl&&typeof drawerEl.open==='function'){
+const cartDrawer=document.querySelector('#my-cart-drawer, [role="dialog"][aria-label*="anier"], cart-drawer');
+if(cartDrawer){cartDrawer.removeAttribute('aria-hidden');}
+return drawerEl.open();
+}
+for(const sel of drawerTriggers){
+const btn=document.querySelector(sel);
+if(btn){
+const cartDrawer=document.querySelector('#my-cart-drawer, [role="dialog"][aria-label*="anier"], cart-drawer');
+if(cartDrawer){cartDrawer.removeAttribute('aria-hidden');}
+btn.click();
+return;
+}
+}
+}
+document.querySelectorAll('.bundle-option-button').forEach(btn=>{
+btn.addEventListener('click',()=>{
+const container=btn.closest('.bundle-buttons');
+const hidden=container.querySelector('.bundle-hidden-input');
+const slot=btn.closest('.bundle-slot');
+container.querySelectorAll('.bundle-option-button').forEach(b=>b.classList.remove('active'));
+btn.classList.add('selecting');
+setTimeout(()=>{
+btn.classList.remove('selecting');
+btn.classList.add('active');
+hidden.value=btn.dataset.variantId;
+updateSlotStatus(slot,true);
+setTimeout(()=>{checkAllSelectionsAndUpdateButton();},50);
+},150);
+});
+});
+function checkAllSelectionsAndUpdateButton(){
+const bundleForm=document.getElementById('bundle-form');
+let allSelected=true;
+let selectedCount=0;
+bundleForm.querySelectorAll('.bundle-hidden-input').forEach(input=>{
+if(input.value&&input.value.trim()!==''){
+selectedCount++;
+}else{
+allSelected=false;
+}
+});
+const nativeButtons=document.querySelectorAll('form[action*="/cart/add"] button[type="submit"], form[action*="/cart/add"] button[name="add"], .product-form__submit, button.product-form__cart-submit');
+nativeButtons.forEach(btn=>{
+if(allSelected){
+btn.textContent="Ajouter au panier";
+btn.disabled=false;
+}else{
+const remaining=variantCount-selectedCount;
+btn.textContent=`Sélectionnez ${remaining} option${remaining>1?'s':''} de plus`;
+btn.disabled=true;
+}
+});
+}
+function createBundlePack(){
+const bundleForm=document.getElementById('bundle-form');
+const props={};
+let isValid=true;
+bundleForm.querySelectorAll('.bundle-buttons').forEach((container,idx)=>{
+const hidden=container.querySelector('.bundle-hidden-input');
+if(!hidden.value){
+const slotNumber=idx+1;
+showToast(`${variantTitle} ${slotNumber} : ${validationMessage}`,'error');
+const slot=container.closest('.bundle-slot');
+slot.classList.add('bundle-slot-error');
+setTimeout(()=>slot.classList.remove('bundle-slot-error'),2000);
+isValid=false;
+return false;
+}
+const activeBtn=container.querySelector('.bundle-option-button.active');
+if(activeBtn){
+const text=activeBtn.textContent.trim();
+props[`${variantTitle} ${idx+1}`]=text;
+}
+});
+if(!isValid)return false;
+const nativeButtons=document.querySelectorAll('form[action*="/cart/add"] button[type="submit"], form[action*="/cart/add"] button[name="add"], .product-form__submit, button.product-form__cart-submit');
+nativeButtons.forEach(btn=>setButtonLoading(btn,true));
+fetch('/cart/add.js',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify({
+id:packVariantId,
+quantity:1,
+properties:props
+})
+})
+.then(response=>{
+if(typeof response.json==='function'){
+return response.json();
+}else{
+return response;
+}
+})
+.then(data=>{
+showToast('✓ Pack ajouté au panier avec succès !','success');
+bundleForm.classList.add('bundle-success');
+setTimeout(()=>bundleForm.classList.remove('bundle-success'),1000);
+setTimeout(()=>openCartDrawer(),500);
+})
+.catch(err=>{
+console.error('Erreur complète:',err);
+showToast(`Erreur lors de l'ajout : ${err.message||err}`,'error');
+})
+.finally(()=>{
+nativeButtons.forEach(btn=>setButtonLoading(btn,false));
+});
+return false;
+}
+setTimeout(()=>{
+const addToCartForms=document.querySelectorAll('form[action="/cart/add"], form[action*="/cart/add"], product-form form');
+const bundleForm=document.getElementById('bundle-form');
+addToCartForms.forEach(form=>{
+if(bundleForm){
+form.addEventListener('submit',function(e){
+e.preventDefault();
+e.stopPropagation();
+createBundlePack();
+});
+const submitButtons=form.querySelectorAll('button[type="submit"], input[type="submit"], button[name="add"]');
+submitButtons.forEach(btn=>{
+const newBtn=btn.cloneNode(true);
+btn.parentNode.replaceChild(newBtn,btn);
+newBtn.addEventListener('click',function(e){
+e.preventDefault();
+e.stopPropagation();
+createBundlePack();
+});
+});
+}
+});
+document.addEventListener('product:add-to-cart',function(e){
+if(bundleForm){
+e.preventDefault();
+e.stopImmediatePropagation();
+createBundlePack();
+}
+},true);
+document.addEventListener('cart:add',function(e){
+if(bundleForm){
+e.preventDefault();
+e.stopImmediatePropagation();
+createBundlePack();
+}
+},true);
+checkAllSelectionsAndUpdateButton();
+},500);
+});
+</script>
+<style>
+.bundle-form{padding:1.5rem;border-radius:8px;background:#fafafa;transition:all 0.3s ease;}
+.bundle-form.bundle-success{background:#f0f9f0;box-shadow:0 0 20px rgba(76,175,80,0.3);}
+.bundle-title{margin-bottom:1rem;font-size:{{ block.settings.title_font_size | default: 24 }}px;font-weight:bold;color:#333;}
+.bundle-slot{margin-bottom:1.5rem;padding:1rem;border:2px solid #e0e0e0;border-radius:8px;background:white;transition:all 0.3s ease;}
+.bundle-slot-empty{border-color:#ffeb3b;background:#fffef0;}
+.bundle-slot-completed{border-color:#4CAF50;background:#f8fff8;}
+.bundle-slot-error{border-color:#f44336;background:#fff5f5;animation:shake 0.5s ease-in-out;}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-5px);}75%{transform:translateX(5px);}}
+.bundle-slot-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;}
+.bundle-slot-header label{font-weight:600;font-size:{{ block.settings.label_font_size | default: 14 }}px;color:#333;margin:0;}
+.bundle-slot-status{opacity:0;transition:opacity 0.3s ease;}
+.bundle-slot-completed .bundle-slot-status{opacity:1;}
+.bundle-checkmark{color:#4CAF50;font-weight:bold;font-size:1.2rem;}
+.bundle-buttons{display:flex;flex-wrap:wrap;gap:0.75rem;}
+.bundle-option-button{padding:0.75rem 1.25rem;border:2px solid #ddd;border-radius:6px;background:white;color:#333;cursor:pointer;font-size:{{ block.settings.button_font_size | default: 15 }}px;transition:all 0.2s ease;position:relative;overflow:hidden;}.bundle-option-button:hover{border-color:#999;box-shadow:0 2px 8px rgba(0,0,0,0.1);transform:translateY(-1px);}
+.bundle-option-button.selecting{transform:scale(0.95);}
+.bundle-option-button.active{background:#333;color:white;border-color:#333;box-shadow:0 4px 12px rgba(0,0,0,0.2);}
+.bundle-option-button.active::after{content:'✓';position:absolute;top:-2px;right:-2px;background:#4CAF50;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;}
+.loading{pointer-events:none;opacity:0.7;}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #f3f3f3;border-top:2px solid #333;border-radius:50%;animation:spin 1s linear infinite;margin-right:8px;}
+@keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+.bundle-toast-container{position:fixed;top:20px;right:20px;z-index:10000;}
+.bundle-toast{background:white;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);margin-bottom:10px;padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;max-width:350px;transform:translateX(100%);opacity:0;transition:all 0.3s ease;}
+.bundle-toast.show{transform:translateX(0);opacity:1;}
+.bundle-toast-success{border-left:4px solid #4CAF50;}
+.bundle-toast-error{border-left:4px solid #f44336;}
+.bundle-toast-info{border-left:4px solid #2196F3;}
+.toast-close{background:none;border:none;font-size:1.5rem;cursor:pointer;padding:0;margin-left:1rem;opacity:0.5;}
+.toast-close:hover{opacity:1;}
+@media (max-width:768px){
+.bundle-form{padding:1rem;}
+.bundle-buttons{gap:0.5rem;}
+.bundle-option-button{padding:0.5rem 1rem;font-size:14px;}
+.bundle-toast-container{top:10px;right:10px;left:10px;}
+.bundle-toast{max-width:none;}
+}
+.bundle-error{color:#f44336;font-weight:bold;padding:1rem;background:#fff5f5;border-radius:8px;border-left:4px solid #f44336;}
+</style>
+{% else %}
+<p class="bundle-error">
+{% if product %}Le produit sélectionné n'a pas de variantes disponibles.
+{% else %}Le produit sélectionné n'existe pas ou n'est pas disponible.{% endif %}
+</p>
+{% endif %}
+{% else %}
+<p class="bundle-error">Veuillez sélectionner un produit "Pack découverte" dans les réglages !</p>
+{% endif %}
+{% schema %}
+{"name":"Bundle","target":"section","settings":[{"type":"product","id":"pack_product","label":"Produit principal (pack découverte)","info":"Le nombre de slots s'adaptera automatiquement au nombre de variantes"},{"type":"text","id":"bundle_heading","label":"Titre du pack (Heading)","default":"Composez votre pack :"},{"type":"text","id":"variant_title","label":"Titre de la variante","default":"Produit","info":"Titre affiché pour chaque sélection (ex: Produit, Complément, Supplément...)"},{"type":"text","id":"validation_message","label":"Message validation absence variant","default":"Veuillez sélectionner une variante"},{"type":"header","content":"Tailles de police"},{"type":"range","id":"title_font_size","label":"Taille du titre principal","min":12,"max":48,"step":1,"unit":"px","default":24},{"type":"range","id":"label_font_size","label":"Taille des sous-titres (Produit 1, 2, etc.)","min":10,"max":20,"step":1,"unit":"px","default":14},{"type":"range","id":"button_font_size","label":"Taille des boutons de variantes","min":10,"max":20,"step":1,"unit":"px","default":15}]}
+{% endschema %}

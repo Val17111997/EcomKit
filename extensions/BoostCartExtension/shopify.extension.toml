@@ -1,0 +1,9 @@
+name = "BoostCartExtension"
+type = "theme"
+
+[settings]
+path = "blocks/boost-cart.liquid"
+extension_points = [
+  # ... autres blocks ...
+  { target = "section", path = "blocks/Bundle.liquid" }
+]
