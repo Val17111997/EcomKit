@@ -209,15 +209,6 @@ export default function Index() {
                           ))}
                         </List>
                       </BlockStack>
-                      
-                      <InlineStack gap="200">
-                        <Button variant="primary" size="large">
-                          Configurer
-                        </Button>
-                        <Button variant="secondary">
-                          Documentation
-                        </Button>
-                      </InlineStack>
                     </BlockStack>
                   </Card>
                 ))}
@@ -239,21 +230,9 @@ export default function Index() {
                         Guide d'installation des extensions
                       </Link>
                     </List.Item>
-                    <List.Item>
-                      <Link url="#" removeUnderline>
-                        Personnalisation avancée
-                      </Link>
-                    </List.Item>
-                    <List.Item>
-                      <Link url="#" removeUnderline>
-                        Optimisation des performances
-                      </Link>
-                    </List.Item>
-                    <List.Item>
-                      <Link url="#" removeUnderline>
-                        Bonnes pratiques UX/UI
-                      </Link>
-                    </List.Item>
+                    <List.Item>Personnalisation avancée</List.Item>
+                    <List.Item>Optimisation des performances</List.Item>
+                    <List.Item>Bonnes pratiques UX/UI</List.Item>
                   </List>
                 </BlockStack>
               </Card>
@@ -287,10 +266,6 @@ export default function Index() {
                       Commencez par configurer votre drawer de panier avec les offres progressives. 
                       C'est l'extension qui aura le plus d'impact sur vos conversions.
                     </Text>
-                    <InlineStack gap="200">
-                      <Button size="small">Configurer maintenant</Button>
-                      <Button variant="secondary" size="small">Voir la démo</Button>
-                    </InlineStack>
                   </BlockStack>
                 </Box>
                 
@@ -301,10 +276,6 @@ export default function Index() {
                       Utilisez Bundle Creator ou PackBuilder selon vos besoins : 
                       Bundle Creator pour des packs simples, PackBuilder pour des expériences plus avancées.
                     </Text>
-                    <InlineStack gap="200">
-                      <Button size="small">Bundle Creator</Button>
-                      <Button size="small">PackBuilder</Button>
-                    </InlineStack>
                   </BlockStack>
                 </Box>
                 
@@ -314,7 +285,6 @@ export default function Index() {
                     <Text variant="bodyMd" tone="subdued">
                       Transformez vos pages produit avec Pack Découverte pour un affichage moderne des variantes.
                     </Text>
-                    <Button size="small">Personnaliser l'affichage</Button>
                   </BlockStack>
                 </Box>
               </BlockStack>
@@ -339,9 +309,6 @@ export default function Index() {
                   <Text variant="bodyMd" tone="subdued">Dernière mise à jour</Text>
                   <Text as="h3" variant="headingMd">Aujourd'hui</Text>
                 </BlockStack>
-                <Button variant="primary">
-                  Vérifier les mises à jour
-                </Button>
               </InlineStack>
             </Card>
           </Layout.Section>
