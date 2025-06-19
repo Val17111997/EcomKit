@@ -284,21 +284,25 @@ const ff=document.getElementById('discount-code-apply-btn');
 function setDiscount(gg,hh){b=gg;c=hh;localStorage.setItem('discountCode',gg);localStorage.setItem('discountRate',hh)}
 function removeDiscount(){b=null;c=0;localStorage.removeItem('discountCode');localStorage.removeItem('discountRate');refreshDiscountDisplay(f)}
 function updateCart(ii=false){
-if(e){return}
+if(e){return Promise.resolve()}
 e=true;
-fetch('/cart.js').then(jj=>jj.json()).then(kk=>{
+return fetch('/cart.js').then(jj=>jj.json()).then(kk=>{
 f=kk;updateDrawer(kk);updateCartBubble(kk.item_count);
 if(!ii&&!d){setTimeout(()=>{checkGiftOffers(kk)},100)}
-}).catch(ll=>console.error("Erreur panier:",ll)).finally(()=>{setTimeout(()=>{e=false},300)})}
+return kk;
+}).catch(ll=>{console.error("Erreur panier:",ll);throw ll}).finally(()=>{setTimeout(()=>{e=false},300)})}
 function openDrawer(){
-// N'ouvre pas le drawer si une mise à jour est en cours
 if(window.cartIsUpdating) {
     console.log('🚫 Drawer bloqué : mise à jour en cours');
     return;
 }
 Z.style.display='flex';Z.setAttribute('aria-hidden','false');Z.removeAttribute('inert');document.body.style.overflow='auto';
 if(g){localStorage.setItem('boostcart_drawer_open','true')}
-setTimeout(()=>updateCart(),50);
+updateCart().then(()=>{
+if(!f||!f.items||f.items.length===0){
+bb.innerHTML='<p style="text-align: center; padding: 40px 20px; font-size: 1.2rem; color: #666;">Votre panier est vide.</p>';
+}
+});
 }
 function safeOpenDrawer(){
 // Fonction qui attend la fin des mises à jour avant d'ouvrir
@@ -492,13 +496,25 @@ window.cartIsUpdating = true;
 return vv(ww,xx).then(zz=>{
 if(zz.ok){
 return zz.json().then(aaa=>{
-updateCart();
-setTimeout(() => {
-    window.cartIsUpdating = false;
-    openDrawer();
-}, 200);
+updateCart().then(()=>{
+if(f&&f.items&&f.items.length>0){
+window.cartIsUpdating=false;
+openDrawer();
+}else{
+setTimeout(()=>{
+updateCart().then(()=>{
+window.cartIsUpdating=false;
+openDrawer();
+});
+},500);
+}
+}).catch(()=>{
+window.cartIsUpdating=false;
+setTimeout(openDrawer,500);
+});
 return aaa;
 })}
+window.cartIsUpdating=false;
 return zz;
 })}
 return vv(ww,xx)};
@@ -508,18 +524,26 @@ jQuery.ajax=function(ccc){
 if(ccc.url&&ccc.url.includes('/cart/add.js')){
 window.cartIsUpdating = true;
 return bbb(ccc).done((ddd)=>{
-updateCart();
-setTimeout(() => {
-    window.cartIsUpdating = false;
-    openDrawer();
-}, 200);
+updateCart().then(()=>{
+if(f&&f.items&&f.items.length>0){
+window.cartIsUpdating=false;
+openDrawer();
+}else{
+setTimeout(()=>{
+updateCart().then(()=>{
+window.cartIsUpdating=false;
+openDrawer();
+});
+},500);
+}
+});
 })}
 return bbb(ccc)}}
 document.addEventListener('submit',eee=>{if(eee.target.action&&eee.target.action.includes('/cart/add')){window.cartIsUpdating = true;setTimeout(()=>{updateCart();setTimeout(() => {window.cartIsUpdating = false;openDrawer();}, 200)},500)}},true);
 const fff=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(ggg,hhh){this._url=hhh;return fff.apply(this,arguments)};
 const iii=XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.send=function(){if(this._url&&this._url.includes('/cart/add.js')){window.cartIsUpdating = true;this.addEventListener('load',()=>{updateCart();setTimeout(() => {window.cartIsUpdating = false;openDrawer();}, 200)})}return iii.apply(this,arguments)}})();
+XMLHttpRequest.prototype.send=function(){if(this._url&&this._url.includes('/cart/add.js')){window.cartIsUpdating = true;this.addEventListener('load',()=>{updateCart().then(()=>{if(f&&f.items&&f.items.length>0){window.cartIsUpdating=false;openDrawer();}else{setTimeout(()=>{updateCart().then(()=>{window.cartIsUpdating=false;openDrawer();});},500);}})})}return iii.apply(this,arguments)}})();
 function updateDrawer(jjj){
 document.querySelectorAll('.spinner').forEach(kkk=>kkk.style.display='none');
 if(!jjj||typeof jjj!=='object'||!Array.isArray(jjj.items)){
@@ -770,14 +794,14 @@ const ssssssss=rrrrrrrr.target.getAttribute('data-variantid');addToCart(ssssssss
 function addToCart(tttttttt){
 window.cartIsUpdating = true;
 fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tttttttt,quantity:1})}).then(()=>{
-updateCart();
-setTimeout(() => {
-    window.cartIsUpdating = false;
-    openDrawer();
-}, 200);
+return updateCart();
+}).then(()=>{
+window.cartIsUpdating = false;
+openDrawer();
 }).catch(uuuuuuuu=>{
 window.cartIsUpdating = false;
 console.error("Erreur ajout produit complémentaire:",uuuuuuuu);
+setTimeout(openDrawer,500);
 })}
 function showErrorMessage(vvvvvvvv){
 let wwwwwwww=document.getElementById('cart-error-message');
