@@ -474,7 +474,7 @@ return vv(ww,xx).then(zz=>{
 if(zz.ok){
 return zz.json().then(aaa=>{
 return updateCart().then(()=>{
-setTimeout(()=>{openDrawer()},200);
+setTimeout(()=>{openDrawer()},2000);
 return aaa;
 });
 })}
@@ -486,7 +486,7 @@ jQuery.ajax=function(ccc){
 if(ccc.url&&ccc.url.includes('/cart/add.js')){
 return bbb(ccc).done((ddd)=>{
 updateCart().then(()=>{
-setTimeout(()=>{openDrawer()},200);
+setTimeout(()=>{openDrawer()},2000);
 });
 })}
 return bbb(ccc)}}
@@ -505,7 +505,7 @@ XMLHttpRequest.prototype.send=function(){
 if(this._url&&this._url.includes('/cart/add.js')){
 this.addEventListener('load',()=>{
 updateCart().then(()=>{
-setTimeout(()=>{openDrawer()},200);
+setTimeout(()=>{openDrawer()},2000);
 });
 })}
 return iii.apply(this,arguments)}})();
@@ -718,7 +718,7 @@ try{
 if(yyyyyyy.type==='add'){
 await fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:yyyyyyy.variant,quantity:1})})}else if(yyyyyyy.type==='remove'){
 await fetch('/cart/change.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({line:yyyyyyy.line,quantity:0})})}
-await new Promise(zzzzzzz=>setTimeout(zzzzzzz,200))}catch(aaaaaaaa){}}
+await new Promise(zzzzzzz=>setTimeout(zzzzzzz,2000))}catch(aaaaaaaa){}}
 setTimeout(()=>{d=false;updateCart(true)},500)}catch(bbbbbbbb){d=false}}).catch(cccccccc=>{d=false})}
 if(ff){ff.addEventListener('click',async()=>{
 const dddddddd=ee.value.trim();
@@ -759,7 +759,7 @@ const ssssssss=rrrrrrrr.target.getAttribute('data-variantid');addToCart(ssssssss
 function addToCart(tttttttt){
 fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tttttttt,quantity:1})}).then(()=>{
 updateCart().then(()=>{
-setTimeout(()=>{openDrawer()},200);
+setTimeout(()=>{openDrawer()},2000);
 });
 }).catch(uuuuuuuu=>console.error("Erreur ajout produit complémentaire:",uuuuuuuu))}
 function showErrorMessage(vvvvvvvv){
