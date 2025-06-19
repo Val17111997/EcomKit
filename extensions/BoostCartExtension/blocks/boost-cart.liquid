@@ -228,7 +228,8 @@ cart-drawer:not(#my-cart-drawer),
 <script>window.__complementaryProducts=[{{ complementary_products_data }}];</script>
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
-let a=false,b=localStorage.getItem('discountCode')||null,c=0,d=false,e=false,f=null;
+// Flag global pour éviter l'ouverture prématurée du drawer
+window.cartIsUpdating = false;
 updateCart();
 const g=window.Shopify&&window.Shopify.designMode;
 if(g){
@@ -290,9 +291,26 @@ f=kk;updateDrawer(kk);updateCartBubble(kk.item_count);
 if(!ii&&!d){setTimeout(()=>{checkGiftOffers(kk)},100)}
 }).catch(ll=>console.error("Erreur panier:",ll)).finally(()=>{setTimeout(()=>{e=false},300)})}
 function openDrawer(){
+// N'ouvre pas le drawer si une mise à jour est en cours
+if(window.cartIsUpdating) {
+    console.log('🚫 Drawer bloqué : mise à jour en cours');
+    return;
+}
 Z.style.display='flex';Z.setAttribute('aria-hidden','false');Z.removeAttribute('inert');document.body.style.overflow='auto';
 if(g){localStorage.setItem('boostcart_drawer_open','true')}
-setTimeout(()=>updateCart(),50)}
+setTimeout(()=>updateCart(),50);
+}
+function safeOpenDrawer(){
+// Fonction qui attend la fin des mises à jour avant d'ouvrir
+function attemptOpen() {
+    if(!window.cartIsUpdating) {
+        openDrawer();
+    } else {
+        setTimeout(attemptOpen, 100);
+    }
+}
+attemptOpen();
+}
 function closeDrawer(){
 Z.style.display='none';Z.setAttribute('aria-hidden','true');Z.setAttribute('inert','');
 if(g){localStorage.setItem('boostcart_drawer_open','false')}}
@@ -389,7 +407,7 @@ function handleCartClick(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     event.stopPropagation();
-    openDrawer();
+    safeOpenDrawer();
     return false;
 }
 
@@ -458,7 +476,7 @@ document.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            openDrawer();
+            safeOpenDrawer();
             return false;
         }
     }
@@ -470,22 +488,38 @@ const vv=window.fetch;
 window.fetch=function(ww,xx){
 let yy=typeof ww==='string'?ww:ww.url;
 if(yy.includes('/cart/add.js')){
+window.cartIsUpdating = true;
 return vv(ww,xx).then(zz=>{
 if(zz.ok){
-return zz.json().then(aaa=>{updateCart();openDrawer();return aaa})}
-return zz})}
+return zz.json().then(aaa=>{
+updateCart();
+setTimeout(() => {
+    window.cartIsUpdating = false;
+    openDrawer();
+}, 200);
+return aaa;
+})}
+return zz;
+})}
 return vv(ww,xx)};
 if(window.jQuery){
 const bbb=jQuery.ajax;
 jQuery.ajax=function(ccc){
 if(ccc.url&&ccc.url.includes('/cart/add.js')){
-return bbb(ccc).done((ddd)=>{updateCart();openDrawer()})}
+window.cartIsUpdating = true;
+return bbb(ccc).done((ddd)=>{
+updateCart();
+setTimeout(() => {
+    window.cartIsUpdating = false;
+    openDrawer();
+}, 200);
+})}
 return bbb(ccc)}}
-document.addEventListener('submit',eee=>{if(eee.target.action&&eee.target.action.includes('/cart/add')){setTimeout(()=>{openDrawer();updateCart()},500)}},true);
+document.addEventListener('submit',eee=>{if(eee.target.action&&eee.target.action.includes('/cart/add')){window.cartIsUpdating = true;setTimeout(()=>{updateCart();setTimeout(() => {window.cartIsUpdating = false;openDrawer();}, 200)},500)}},true);
 const fff=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(ggg,hhh){this._url=hhh;return fff.apply(this,arguments)};
 const iii=XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.send=function(){if(this._url&&this._url.includes('/cart/add.js')){this.addEventListener('load',()=>{updateCart();openDrawer()})}return iii.apply(this,arguments)}})();
+XMLHttpRequest.prototype.send=function(){if(this._url&&this._url.includes('/cart/add.js')){window.cartIsUpdating = true;this.addEventListener('load',()=>{updateCart();setTimeout(() => {window.cartIsUpdating = false;openDrawer();}, 200)})}return iii.apply(this,arguments)}})();
 function updateDrawer(jjj){
 document.querySelectorAll('.spinner').forEach(kkk=>kkk.style.display='none');
 if(!jjj||typeof jjj!=='object'||!Array.isArray(jjj.items)){
@@ -734,7 +768,17 @@ mmmmmmmm.insertAdjacentHTML('beforeend',pppppppp)});
 mmmmmmmm.querySelectorAll('.complementary-add-btn').forEach(qqqqqqqq=>{qqqqqqqq.addEventListener('click',rrrrrrrr=>{
 const ssssssss=rrrrrrrr.target.getAttribute('data-variantid');addToCart(ssssssss)})})}
 function addToCart(tttttttt){
-fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tttttttt,quantity:1})}).then(()=>{setTimeout(()=>{updateCart();openDrawer()},500)}).catch(uuuuuuuu=>console.error("Erreur ajout produit complémentaire:",uuuuuuuu))}
+window.cartIsUpdating = true;
+fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tttttttt,quantity:1})}).then(()=>{
+updateCart();
+setTimeout(() => {
+    window.cartIsUpdating = false;
+    openDrawer();
+}, 200);
+}).catch(uuuuuuuu=>{
+window.cartIsUpdating = false;
+console.error("Erreur ajout produit complémentaire:",uuuuuuuu);
+})}
 function showErrorMessage(vvvvvvvv){
 let wwwwwwww=document.getElementById('cart-error-message');
 if(!wwwwwwww){wwwwwwww=document.createElement('div');wwwwwwww.id='cart-error-message';wwwwwwww.style.cssText=`position: fixed;top: 20px;right: 20px;background: #ff6b6b;color: white;padding: 10px 15px;border-radius: 5px;font-size: 14px;z-index: 100000;opacity: 0;transition: opacity 0.3s ease;`;document.body.appendChild(wwwwwwww)}
