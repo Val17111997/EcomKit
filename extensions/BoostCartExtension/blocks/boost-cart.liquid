@@ -229,6 +229,41 @@ cart-drawer:not(#my-cart-drawer),
 <script>
 document.addEventListener('DOMContentLoaded',()=>{
 let a=false,b=localStorage.getItem('discountCode')||null,c=0,d=false,e=false,f=null;
+async function updateCartAndWait() {
+  if (e) {
+    // Si une mise à jour est en cours, attendre qu'elle se termine
+    return new Promise(resolve => {
+      const checkUpdate = () => {
+        if (!e) {
+          resolve();
+        } else {
+          setTimeout(checkUpdate, 50);
+        }
+      };
+      checkUpdate();
+    });
+  }
+  
+  e = true;
+  try {
+    const response = await fetch('/cart.js');
+    const cartData = await response.json();
+    f = cartData;
+    updateDrawer(cartData);
+    updateCartBubble(cartData.item_count);
+    
+    if (!d) {
+      setTimeout(() => checkGiftOffers(cartData), 100);
+    }
+    
+    return cartData;
+  } catch (error) {
+    console.error("Erreur panier:", error);
+    throw error;
+  } finally {
+    setTimeout(() => { e = false; }, 300);
+  }
+}
 updateCart();
 const g=window.Shopify&&window.Shopify.designMode;
 if(g){
@@ -472,7 +507,13 @@ let yy=typeof ww==='string'?ww:ww.url;
 if(yy.includes('/cart/add.js')){
 return vv(ww,xx).then(zz=>{
 if(zz.ok){
-return zz.json().then(aaa=>{updateCart();openDrawer();return aaa})}
+return zz.json().then(async aaa=>{
+  // ATTENDRE que la mise à jour soit terminée
+  await updateCartAndWait();
+  // PUIS ouvrir le drawer
+  openDrawer();
+  return aaa;
+})}
 return zz})}
 return vv(ww,xx)};
 if(window.jQuery){
@@ -481,11 +522,22 @@ jQuery.ajax=function(ccc){
 if(ccc.url&&ccc.url.includes('/cart/add.js')){
 return bbb(ccc).done((ddd)=>{updateCart();openDrawer()})}
 return bbb(ccc)}}
-document.addEventListener('submit',eee=>{if(eee.target.action&&eee.target.action.includes('/cart/add')){setTimeout(()=>{openDrawer();updateCart()},500)}},true);
-const fff=XMLHttpRequest.prototype.open;
+document.addEventListener('submit', eee => {
+  if (eee.target.action && eee.target.action.includes('/cart/add')) {
+    setTimeout(async () => {
+      await updateCartAndWait();
+      openDrawer();
+    }, 500);
+  }
+}, true);const fff=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(ggg,hhh){this._url=hhh;return fff.apply(this,arguments)};
 const iii=XMLHttpRequest.prototype.send;
-XMLHttpRequest.prototype.send=function(){if(this._url&&this._url.includes('/cart/add.js')){this.addEventListener('load',()=>{updateCart();openDrawer()})}return iii.apply(this,arguments)}})();
+XMLHttpRequest.prototype.send=function(){if(this._url&&this._url.includes('/cart/add.js')){
+  this.addEventListener('load', async () => {
+    await updateCartAndWait();
+    openDrawer();
+  });
+}return iii.apply(this,arguments)}})();
 function updateDrawer(jjj){
 document.querySelectorAll('.spinner').forEach(kkk=>kkk.style.display='none');
 if(!jjj||typeof jjj!=='object'||!Array.isArray(jjj.items)){
