@@ -296,19 +296,37 @@ if(window.cartIsUpdating) {
     console.log('🚫 Drawer bloqué : mise à jour en cours');
     return;
 }
-Z.style.display='flex';Z.setAttribute('aria-hidden','false');Z.removeAttribute('inert');document.body.style.overflow='auto';
-if(g){localStorage.setItem('boostcart_drawer_open','true')}
+// Afficher un loader pendant le chargement
+bb.innerHTML='<div style="text-align:center;padding:40px;"><div class="spinner" style="display:inline-block;border:2px solid rgba(0,0,0,0.1);border-top:2px solid #555;border-radius:50%;width:30px;height:30px;animation:spin 0.5s linear infinite;"></div><p style="margin-top:10px;color:#666;">Chargement...</p></div>';
+// Mettre à jour le panier AVANT d'afficher le drawer
 updateCart().then(()=>{
-if(!f||!f.items||f.items.length===0){
-bb.innerHTML='<p style="text-align: center; padding: 40px 20px; font-size: 1.2rem; color: #666;">Votre panier est vide.</p>';
-}
+// Maintenant afficher le drawer avec les données chargées
+Z.style.display='flex';
+Z.setAttribute('aria-hidden','false');
+Z.removeAttribute('inert');
+document.body.style.overflow='auto';
+if(g){localStorage.setItem('boostcart_drawer_open','true')}
+}).catch(()=>{
+// En cas d'erreur, afficher quand même le drawer
+Z.style.display='flex';
+Z.setAttribute('aria-hidden','false');
+Z.removeAttribute('inert');
+bb.innerHTML='<p style="text-align: center; padding: 40px 20px; color: #ff6b6b;">Erreur de chargement. Veuillez réessayer.</p>';
 });
 }
 function safeOpenDrawer(){
-// Fonction qui attend la fin des mises à jour avant d'ouvrir
 function attemptOpen() {
     if(!window.cartIsUpdating) {
-        openDrawer();
+        // Précharger les données du panier avant d'ouvrir
+        updateCart().then(() => {
+            if(Z.style.display !== 'flex') {
+                Z.style.display='flex';
+                Z.setAttribute('aria-hidden','false');
+                Z.removeAttribute('inert');
+                document.body.style.overflow='auto';
+                if(g){localStorage.setItem('boostcart_drawer_open','true')}
+            }
+        });
     } else {
         setTimeout(attemptOpen, 100);
     }
@@ -794,14 +812,14 @@ const ssssssss=rrrrrrrr.target.getAttribute('data-variantid');addToCart(ssssssss
 function addToCart(tttttttt){
 window.cartIsUpdating = true;
 fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tttttttt,quantity:1})}).then(()=>{
-return updateCart();
-}).then(()=>{
-window.cartIsUpdating = false;
-openDrawer();
+updateCart();
+setTimeout(() => {
+    window.cartIsUpdating = false;
+    openDrawer();
+}, 200);
 }).catch(uuuuuuuu=>{
 window.cartIsUpdating = false;
 console.error("Erreur ajout produit complémentaire:",uuuuuuuu);
-setTimeout(openDrawer,500);
 })}
 function showErrorMessage(vvvvvvvv){
 let wwwwwwww=document.getElementById('cart-error-message');
