@@ -314,6 +314,12 @@ Z.removeAttribute('inert');
 bb.innerHTML='<p style="text-align: center; padding: 40px 20px; color: #ff6b6b;">Erreur de chargement. Veuillez réessayer.</p>';
 });
 }
+// À ajouter à la FIN de la fonction openDrawer
+setTimeout(()=>{
+if(Z.style.display==='flex' && (!f || !f.items || bb.innerHTML.includes('Chargement'))){
+updateCart();
+}
+}, 300);
 function safeOpenDrawer(){
 function attemptOpen() {
     if(!window.cartIsUpdating) {
