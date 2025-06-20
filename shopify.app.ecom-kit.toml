@@ -3,7 +3,7 @@
 client_id = "12cef638ec0c369730c3c21c3372f0c9"
 name = "ecom-kit"
 handle = "ecom-kit-2"
-application_url = "https://feature-screenshots-combined-rope.trycloudflare.com"
+application_url = "https://screens-diagnostic-silly-justice.trycloudflare.com"
 embedded = true
 
 [build]
@@ -19,9 +19,9 @@ scopes = ""
 
 [auth]
 redirect_urls = [
-  "https://feature-screenshots-combined-rope.trycloudflare.com/auth/callback",
-  "https://feature-screenshots-combined-rope.trycloudflare.com/auth/shopify/callback",
-  "https://feature-screenshots-combined-rope.trycloudflare.com/api/auth/callback"
+  "https://screens-diagnostic-silly-justice.trycloudflare.com/auth/callback",
+  "https://screens-diagnostic-silly-justice.trycloudflare.com/auth/shopify/callback",
+  "https://screens-diagnostic-silly-justice.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
