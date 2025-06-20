@@ -395,7 +395,7 @@ function handleCartClick(event) {
 
 // 4. MASQUER LE DRAWER NATIF
 const hideNativeDrawer = document.createElement('style');
-hideNativeDrawer.textContent = 
+hideNativeDrawer.textContent = `
     .cart-drawer__dialog,
     dialog.cart-drawer__dialog,
     .drawer--is-open[id*="cart"],
@@ -405,7 +405,7 @@ hideNativeDrawer.textContent =
         opacity: 0 !important;
         pointer-events: none !important;
     }
-;
+`;
 document.head.appendChild(hideNativeDrawer);
 
 // EXÉCUTION COMBINÉE
@@ -466,22 +466,153 @@ document.addEventListener('click', function(e) {
 
 })();
 (function(){
+// Variables pour le système de refresh forcé
+let blockAutoOpen = false;
+let cartUpdatePromise = null;
+
+// Nouvelle fonction pour forcer le refresh du contenu
+async function forceCartRefresh() {
+    try {
+        const response = await fetch('/cart.js');
+        const cart = await response.json();
+        
+        if (cart.item_count === 0) {
+            console.log('❌ Panier vide côté serveur');
+            return false;
+        }
+        
+        const cartContent = document.getElementById('my-cart-content');
+        const itemsWrapper = document.getElementById('cart-items-wrapper');
+        
+        // Déclencher les événements Shopify
+        window.dispatchEvent(new CustomEvent('cart:refresh'));
+        document.dispatchEvent(new CustomEvent('cart:updated', { detail: cart }));
+        
+        // Forcer un rechargement via fetch de la section
+        try {
+            const sectionResponse = await fetch(window.location.pathname + '?section_id=cart-drawer');
+            const html = await sectionResponse.text();
+            
+            const parser = new DOMParser();
+            const newDoc = parser.parseFromString(html, 'text/html');
+            const newContent = newDoc.getElementById('my-cart-content');
+            
+            if (newContent && cartContent) {
+                cartContent.style.opacity = '0.8';
+                cartContent.innerHTML = newContent.innerHTML;
+                
+                requestAnimationFrame(() => {
+                    cartContent.style.opacity = '1';
+                });
+            }
+        } catch (e) {
+            console.log('Section refresh non disponible');
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Erreur refresh:', error);
+        return false;
+    }
+}
+
+// Nouvelle fonction openDrawer avec refresh
+async function openDrawerWithRefresh() {
+    console.log('🎯 Ouverture avec refresh...');
+    
+    // Ouvrir immédiatement
+    const drawer = document.getElementById('my-cart-drawer');
+    drawer.style.display = 'flex';
+    drawer.setAttribute('aria-hidden', 'false');
+    drawer.removeAttribute('inert');
+    
+    // Masquer temporairement le contenu
+    drawer.classList.add('cart-loading');
+    
+    // CSS pour l'animation (si pas déjà présent)
+    if (!document.getElementById('cart-loading-style')) {
+        const style = document.createElement('style');
+        style.id = 'cart-loading-style';
+        style.textContent = `
+            .cart-loading #my-cart-content {
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            #my-cart-content {
+                transition: opacity 0.3s ease;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Refresh après un court délai
+    setTimeout(async () => {
+        const refreshed = await forceCartRefresh();
+        drawer.classList.remove('cart-loading');
+        
+        if (!refreshed) {
+            setTimeout(() => {
+                drawer.style.display = 'none';
+                drawer.setAttribute('aria-hidden', 'true');
+            }, 500);
+        }
+        
+        blockAutoOpen = false;
+    }, 100);
+}
+
+// Observer pour bloquer les ouvertures automatiques pendant le refresh
+const drawerObserver = new MutationObserver((mutations) => {
+    if (blockAutoOpen) {
+        mutations.forEach((mutation) => {
+            const drawer = document.getElementById('my-cart-drawer');
+            if (mutation.attributeName === 'style' || mutation.attributeName === 'aria-hidden') {
+                const isOpening = drawer.style.display === 'flex' || 
+                                 drawer.getAttribute('aria-hidden') === 'false';
+                
+                if (isOpening && !drawer.classList.contains('force-open')) {
+                    drawer.style.display = 'none';
+                    drawer.setAttribute('aria-hidden', 'true');
+                    drawer.setAttribute('inert', '');
+                }
+            }
+        });
+    }
+});
+
+const drawer = document.getElementById('my-cart-drawer');
+drawerObserver.observe(drawer, { attributes: true });
+
+// Intercepter fetch avec le nouveau système
 const vv=window.fetch;
 window.fetch=function(ww,xx){
 let yy=typeof ww==='string'?ww:ww.url;
 if(yy.includes('/cart/add.js')){
+blockAutoOpen = true;
 return vv(ww,xx).then(zz=>{
 if(zz.ok){
-return zz.json().then(aaa=>{updateCart();openDrawer();return aaa})}
+return zz.json().then(aaa=>{
+console.log('✅ Produit ajouté');
+updateCart();
+// Utiliser la nouvelle fonction avec refresh
+setTimeout(() => {
+    openDrawerWithRefresh();
+}, 300);
+return aaa})}else{
+blockAutoOpen = false;
+}
 return zz})}
 return vv(ww,xx)};
 if(window.jQuery){
 const bbb=jQuery.ajax;
 jQuery.ajax=function(ccc){
 if(ccc.url&&ccc.url.includes('/cart/add.js')){
-return bbb(ccc).done((ddd)=>{updateCart();openDrawer()})}
+blockAutoOpen = true;
+return bbb(ccc).done((ddd)=>{updateCart();setTimeout(() => {openDrawerWithRefresh()}, 300)})}
 return bbb(ccc)}}
-document.addEventListener('submit',eee=>{if(eee.target.action&&eee.target.action.includes('/cart/add')){setTimeout(()=>{openDrawer();updateCart()},500)}},true);
+document.addEventListener('submit',eee=>{if(eee.target.action&&eee.target.action.includes('/cart/add')){
+blockAutoOpen = true;
+setTimeout(()=>{openDrawerWithRefresh()},800)}},true);
 const fff=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(ggg,hhh){this._url=hhh;return fff.apply(this,arguments)};
 const iii=XMLHttpRequest.prototype.send;
@@ -502,31 +633,31 @@ nnn++;
 const rrr=qqq+1;
 const sss=ppp.image||"https://via.placeholder.com/60";
 const ttt=ppp.final_line_price;
-const uuu=<button class="trash-btn" aria-label="Supprimer l'article"><svg width="14" height="14" fill="currentColor" viewBox="0 0 448 512"><path d="M432 32H312l-9.4-18.7A24 24 0 00272.2 0H175.8a24 24 0 00-22.4 13.3L144 32H16A16 16 0 000 48v32a16 16 0 0016 16h16l21.2 372.4A48 48 0 00101.1 512h245.8a48 48 0 0047.9-43.6L416 96h16a16 16 0 0016-16V48a16 16 0 00-16-16zM171.8 51.2a6 6 0 015.4-3.2h128.4a6 6 0 015.4 3.2L316.6 96H131.4zM112 192a24 24 0 0148 0v224a24 24 0 01-48 0zm96 0a24 24 0 0148 0v224a24 24 0 01-48 0z"/></svg></button>;const vvv=R.includes(String(ppp.variant_id));
+const uuu=`<button class="trash-btn" aria-label="Supprimer l'article"><svg width="14" height="14" fill="currentColor" viewBox="0 0 448 512"><path d="M432 32H312l-9.4-18.7A24 24 0 00272.2 0H175.8a24 24 0 00-22.4 13.3L144 32H16A16 16 0 000 48v32a16 16 0 0016 16h16l21.2 372.4A48 48 0 00101.1 512h245.8a48 48 0 0047.9-43.6L416 96h16a16 16 0 0016-16V48a16 16 0 00-16-16zM171.8 51.2a6 6 0 015.4-3.2h128.4a6 6 0 015.4 3.2L316.6 96H131.4zM112 192a24 24 0 0148 0v224a24 24 0 01-48 0zm96 0a24 24 0 0148 0v224a24 24 0 01-48 0z"/></svg></button>`;const vvv=R.includes(String(ppp.variant_id));
 let www='';
 let xxx=null;
 if(vvv){
 const yyy=O.find(zzz=>zzz.gift_variant===String(ppp.variant_id))?.gift_compare_price||0;
 if(yyy>0){xxx=yyy*ppp.quantity*100}}else if(ppp.original_line_price){xxx=ppp.original_line_price}
 if(xxx&&xxx>ttt){
-www=<div style="display:flex;flex-direction:column;"><del style="color:#888;font-size:{{ block.settings.product_price_size | default: 14 | times: 0.9 }}px;">${formatMoney(xxx)}</del><strong style="font-size:{{ block.settings.product_price_size | default: 14 }}px;">${formatMoney(ttt)}</strong></div>}else{
-www=<strong>${formatMoney(ttt)}</strong>}
+www=`<div style="display:flex;flex-direction:column;"><del style="color:#888;font-size:{{ block.settings.product_price_size | default: 14 | times: 0.9 }}px;">${formatMoney(xxx)}</del><strong style="font-size:{{ block.settings.product_price_size | default: 14 }}px;">${formatMoney(ttt)}</strong></div>`}else{
+www=`<strong>${formatMoney(ttt)}</strong>`}
 let aaaa='';
 if(ppp.properties&&Object.keys(ppp.properties).length>0){
 Object.entries(ppp.properties).forEach(([bbbb,cccc])=>{
-if(cccc&&!bbbb.startsWith('_')){aaaa+=<div style="font-size:0.9em;color:#666;margin:2px 0;">${bbbb}: ${cccc}</div>}})}
-ooo+=<div class="cart-item" data-variant-id="${ppp.variant_id}" style="display:flex;gap:10px;margin-bottom:10px;"><img src="${sss}" alt="${ppp.product_title}" width="60" style="object-fit:cover;"><div style="flex:1;"><strong style="display:block;margin-bottom:4px;">${ppp.product_title}</strong>${aaaa}<div style="display:flex;align-items:center;">${www}<div class="quantity-controls" data-lineindex="${rrr}" style="margin-left:auto;"><input class="qty-input" type="number" min="1" value="${ppp.quantity}" />${uuu}<div class="spinner"></div></div></div></div></div>;
+if(cccc&&!bbbb.startsWith('_')){aaaa+=`<div style="font-size:0.9em;color:#666;margin:2px 0;">${bbbb}: ${cccc}</div>`}})}
+ooo+=`<div class="cart-item" data-variant-id="${ppp.variant_id}" style="display:flex;gap:10px;margin-bottom:10px;"><img src="${sss}" alt="${ppp.product_title}" width="60" style="object-fit:cover;"><div style="flex:1;"><strong style="display:block;margin-bottom:4px;">${ppp.product_title}</strong>${aaaa}<div style="display:flex;align-items:center;">${www}<div class="quantity-controls" data-lineindex="${rrr}" style="margin-left:auto;"><input class="qty-input" type="number" min="1" value="${ppp.quantity}" />${uuu}<div class="spinner"></div></div></div></div></div>`;
 });
-bb.innerHTML=nnn===0?'<div id="cart-items-wrapper"><p>Votre panier est vide (hors cadeau).</p></div>':<div id="cart-items-wrapper">${ooo}</div>}{% if block.settings.show_gift_offers %}
+bb.innerHTML=nnn===0?'<div id="cart-items-wrapper"><p>Votre panier est vide (hors cadeau).</p></div>':`<div id="cart-items-wrapper">${ooo}</div>`}{% if block.settings.show_gift_offers %}
 const cartItemsWrapper = document.getElementById('cart-items-wrapper');
 if (cartItemsWrapper) {
     if (!document.getElementById('gift-offers-container')) {
-        cartItemsWrapper.insertAdjacentHTML('beforeend',<div id="gift-offers-container"></div>);
+        cartItemsWrapper.insertAdjacentHTML('beforeend',`<div id="gift-offers-container"></div>`);
     }
 }{% endif %}
 {% if block.settings.show_complementary_products %}
 if(lll.length>0){
-bb.insertAdjacentHTML('beforeend',<div id="complementary-products-section"><h3 style="font-size:{{ block.settings.section_title_size | default: 17 }}px; margin-bottom:1rem; text-align:center;">{{ block.settings.complementary_products_title | default: "Meilleures ventes" }}</h3><div id="complementary-products-container"></div></div>)}
+bb.insertAdjacentHTML('beforeend',`<div id="complementary-products-section"><h3 style="font-size:{{ block.settings.section_title_size | default: 17 }}px; margin-bottom:1rem; text-align:center;">{{ block.settings.complementary_products_title | default: "Meilleures ventes" }}</h3><div id="complementary-products-container"></div></div>`)}
 {% endif %}
 cc.textContent=formatMoney(jjj.total_price);
 if(jjj.total_price===0){dd.textContent='Panier vide';dd.disabled=true}else{dd.textContent='Je finalise - '+formatMoney(jjj.total_price);dd.disabled=false}
@@ -581,7 +712,7 @@ actuallyUpdateQuantity(eeee, 0);
 }})}
 async function actuallyUpdateQuantity(ddddd,eeeee){
 if(Y.has(ddddd)){return}
-const fffff=document.querySelector(.quantity-controls[data-lineindex="${ddddd}"]);
+const fffff=document.querySelector(`.quantity-controls[data-lineindex="${ddddd}"]`);
 if(!fffff)return;
 const hhhhh=fffff.querySelector('.spinner');
 const iiiii=fffff.querySelector('.qty-input');
@@ -612,9 +743,9 @@ const zzzzz=wwwww>=yyyyy.threshold;
 let aaaaaa=(yyyyy.threshold-wwwww).toFixed(2);
 if(aaaaaa<0)aaaaaa='0.00';
 let bbbbbb='';
-if(!zzzzz){bbbbbb=Encore <span style="color:{{ block.settings.success_color | default: '#459f2b' }};">${aaaaaa}€</span> pour obtenir ${yyyyy.gift_title} !}else{bbbbbb=${yyyyy.gift_title} ajouté à votre commande ✅}
-const cccccc=<div class="gift-offer-encart"><img src="${yyyyy.gift_image}" alt="${yyyyy.gift_title}" class="gift-offer-image"><div class="gift-offer-info">${!zzzzz?<div class="gift-offer-message" style="margin-bottom:6px;">${bbbbbb}</div>:''}
-<div class="gift-offer-title"> Offert : ${yyyyy.gift_title}</div><div class="gift-offer-price" style="margin: 4px 0;"><del>${yyyyy.gift_compare_price.toFixed(2).replace('.', ',')}€</del><strong style="color:{{ block.settings.success_color | default: '#459f2b' }};"> OFFERT</strong></div>${zzzzz?<div class="gift-offer-message" style="margin-top:4px;">${bbbbbb}</div>:''}</div></div>;
+if(!zzzzz){bbbbbb=`Encore <span style="color:{{ block.settings.success_color | default: '#459f2b' }};">${aaaaaa}€</span> pour obtenir ${yyyyy.gift_title} !`}else{bbbbbb=`${yyyyy.gift_title} ajouté à votre commande ✅`}
+const cccccc=`<div class="gift-offer-encart"><img src="${yyyyy.gift_image}" alt="${yyyyy.gift_title}" class="gift-offer-image"><div class="gift-offer-info">${!zzzzz?`<div class="gift-offer-message" style="margin-bottom:6px;">${bbbbbb}</div>`:''}
+<div class="gift-offer-title"> Offert : ${yyyyy.gift_title}</div><div class="gift-offer-price" style="margin: 4px 0;"><del>${yyyyy.gift_compare_price.toFixed(2).replace('.', ',')}€</del><strong style="color:{{ block.settings.success_color | default: '#459f2b' }};"> OFFERT</strong></div>${zzzzz?`<div class="gift-offer-message" style="margin-top:4px;">${bbbbbb}</div>`:''}</div></div>`;
 vvvvv.insertAdjacentHTML('beforeend',cccccc)})}
 function updateProgressBar(dddddd){
 const eeeeee=(dddddd||0)/100;
@@ -622,7 +753,7 @@ const ffffff=document.getElementById('progress-container');
 if(!O.length){ffffff.classList.add('hidden');return}else{ffffff.classList.remove('hidden')}
 if(dddddd===0){ffffff.classList.add('hidden');document.getElementById('offer-messages').innerHTML='';return}
 const gggggg=document.getElementById('progress-bar');
-gggggg.innerHTML=<div id="progress-fill"><span class="invisible-placeholder">&nbsp;</span></div>;
+gggggg.innerHTML=`<div id="progress-fill"><span class="invisible-placeholder">&nbsp;</span></div>`;
 const hhhhhh=gggggg.querySelector('#progress-fill');
 const iiiiii=Math.max(...O.map(jjjjjj=>jjjjjj.threshold))||1;
 const kkkkkk=Math.min((eeeeee/iiiiii)*100,100);
@@ -638,14 +769,14 @@ if(pppppp<nnnnnn+mmmmmm){pppppp=nnnnnn+mmmmmm;pppppp=Math.min(pppppp,qqqqqq)}
 nnnnnn=pppppp;
 const rrrrrr=(pppppp/llllll)*100;
 const ssssss=eeeeee>=oooooo.threshold;
-const tttttt={{ block.settings.progress_background | default: '#e0e0e0' }};
-const uuuuuu={{ block.settings.progress_fill_color | default: '#76c7c0' }};
+const tttttt=`{{ block.settings.progress_background | default: '#e0e0e0' }}`;
+const uuuuuu=`{{ block.settings.progress_fill_color | default: '#76c7c0' }}`;
 const vvvvvv=ssssss?uuuuuu:tttttt;
-const wwwwww=(oooooo.type==='shipping')?<svg viewBox="0 0 640 512"><path d="M368 32H96C60.65 32 32 60.65 32 96V288C32 323.3 60.65 352 96 352H120.9C109.4 367.8 104 386.3 104 400C104 444.2 139.8 480 184 480C228.2 480 264 444.2 264 400C264 386.3 258.6 367.8 247.1 352H392.9C381.4 367.8 376 386.3 376 400C376 444.2 411.8 480 456 480C500.2 480 536 444.2 536 400C536 386.3 530.6 367.8 519.1 352H544C579.3 352 608 323.3 608 288V176C608 149.5 589.2 126.9 563.5 122.6L471.7 106.2C461.2 104.3 450.5 96 448.2 85.47L439.5 48.44C434.7 26.47 414.2 10.2 391.6 12.3L376.5 13.74C372.2 14.18 368 18.35 368 22.73V32zM184 432C166.3 432 152 417.7 152 400C152 382.3 166.3 368 184 368C201.7 368 216 382.3 216 400C216 417.7 201.7 432 184 432zM456 432C438.3 432 424 417.7 424 400C424 382.3 438.3 368 456 368C473.7 368 488 382.3 488 400C488 417.7 473.7 432 456 432z"/></svg>:<svg viewBox="0 0 512 512"><path d="M152 64C152 28.65 180.7 0 216 0C242.4 0 265.1 14.29 277.3 35.62C289.5 14.29 312.2 0 338.5 0C373.8 0 402.5 28.65 402.5 64C402.5 81.67 396.4 97.1 386.6 109.2L364.5 134.1H448C483.3 134.1 512 163.7 512 199.1V240C512 248.8 504.8 256 496 256H32C23.16 256 16 248.8 16 240V199.1C16 163.7 44.65 134.1 80 134.1H163.5L141.4 109.2C131.6 97.1 125.5 81.67 125.5 64V64zM152 64V63.1C152 46.33 165.3 32 183.1 32C200.9 32 214.3 46.33 214.3 63.1V96H183.1C168.4 96 152 79.6 152 64H152zM328.3 63.1C328.3 46.33 341.7 32 359.5 32C377.2 32 390.5 46.33 390.5 63.1V64C390.5 79.6 374.1 96 359.5 96H328.3V63.1zM32 288H480V448C480 483.3 451.3 512 416 512H96C60.65 512 32 483.3 32 448V288z"/></svg>;
+const wwwwww=(oooooo.type==='shipping')?`<svg viewBox="0 0 640 512"><path d="M368 32H96C60.65 32 32 60.65 32 96V288C32 323.3 60.65 352 96 352H120.9C109.4 367.8 104 386.3 104 400C104 444.2 139.8 480 184 480C228.2 480 264 444.2 264 400C264 386.3 258.6 367.8 247.1 352H392.9C381.4 367.8 376 386.3 376 400C376 444.2 411.8 480 456 480C500.2 480 536 444.2 536 400C536 386.3 530.6 367.8 519.1 352H544C579.3 352 608 323.3 608 288V176C608 149.5 589.2 126.9 563.5 122.6L471.7 106.2C461.2 104.3 450.5 96 448.2 85.47L439.5 48.44C434.7 26.47 414.2 10.2 391.6 12.3L376.5 13.74C372.2 14.18 368 18.35 368 22.73V32zM184 432C166.3 432 152 417.7 152 400C152 382.3 166.3 368 184 368C201.7 368 216 382.3 216 400C216 417.7 201.7 432 184 432zM456 432C438.3 432 424 417.7 424 400C424 382.3 438.3 368 456 368C473.7 368 488 382.3 488 400C488 417.7 473.7 432 456 432z"/></svg>`:`<svg viewBox="0 0 512 512"><path d="M152 64C152 28.65 180.7 0 216 0C242.4 0 265.1 14.29 277.3 35.62C289.5 14.29 312.2 0 338.5 0C373.8 0 402.5 28.65 402.5 64C402.5 81.67 396.4 97.1 386.6 109.2L364.5 134.1H448C483.3 134.1 512 163.7 512 199.1V240C512 248.8 504.8 256 496 256H32C23.16 256 16 248.8 16 240V199.1C16 163.7 44.65 134.1 80 134.1H163.5L141.4 109.2C131.6 97.1 125.5 81.67 125.5 64V64zM152 64V63.1C152 46.33 165.3 32 183.1 32C200.9 32 214.3 46.33 214.3 63.1V96H183.1C168.4 96 152 79.6 152 64H152zM328.3 63.1C328.3 46.33 341.7 32 359.5 32C377.2 32 390.5 46.33 390.5 63.1V64C390.5 79.6 374.1 96 359.5 96H328.3V63.1zM32 288H480V448C480 483.3 451.3 512 416 512H96C60.65 512 32 483.3 32 448V288z"/></svg>`;
 const xxxxxx=document.createElement('div');
 xxxxxx.classList.add('progress-icon');
 xxxxxx.style.left=rrrrrr+'%';
-xxxxxx.innerHTML=<div class="icon-circle" style="background: ${tttttt}; border: 3px solid ${vvvvvv};">${wwwwww}</div>;
+xxxxxx.innerHTML=`<div class="icon-circle" style="background: ${tttttt}; border: 3px solid ${vvvvvv};">${wwwwww}</div>`;
 gggggg.appendChild(xxxxxx)});
 let yyyyyy="";
 if(O.length===1){
@@ -701,7 +832,7 @@ if(ff){ff.addEventListener('click',async()=>{
 const dddddddd=ee.value.trim();
 if(!dddddddd)return;
 try{
-const eeeeeeee=await fetch(/checkout?discount=${encodeURIComponent(dddddddd)}&edge_redirect=true&skip_checkout_webhook=true,{credentials:'include'});
+const eeeeeeee=await fetch(`/checkout?discount=${encodeURIComponent(dddddddd)}&edge_redirect=true&skip_checkout_webhook=true`,{credentials:'include'});
 a=eeeeeeee.ok||eeeeeeee.status===302;setDiscount(dddddddd,0)}catch(ffffffff){a=false;removeDiscount()}
 updateCart()})}
 function refreshDiscountDisplay(gggggggg){
@@ -711,7 +842,7 @@ hhhhhhhh.innerHTML='';
 let iiiiiiii=0;
 if(gggggggg.original_total_price){iiiiiiii=gggggggg.original_total_price-gggggggg.total_price}else{iiiiiiii=gggggggg.total_discount}
 if(b){
-if(iiiiiiii>0){hhhhhhhh.innerHTML=<div class="discount-bubble valid">✅ Code promo ajouté<span class="remove-discount" title="Retirer le code promo">×</span></div>}else{hhhhhhhh.innerHTML=<div class="discount-bubble">Code promo invalide<span class="remove-discount" title="Retirer le code promo">×</span></div>}
+if(iiiiiiii>0){hhhhhhhh.innerHTML=`<div class="discount-bubble valid">✅ Code promo ajouté<span class="remove-discount" title="Retirer le code promo">×</span></div>`}else{hhhhhhhh.innerHTML=`<div class="discount-bubble">Code promo invalide<span class="remove-discount" title="Retirer le code promo">×</span></div>`}
 hhhhhhhh.querySelector('.remove-discount').addEventListener('click',removeDiscount)}
 const jjjjjjjj=gggggggg.original_total_price?gggggggg.original_total_price:gggggggg.total_price;
 let kkkkkkkk=jjjjjjjj;
@@ -729,7 +860,7 @@ if(!mmmmmmmm)return;mmmmmmmm.innerHTML='';
 if(!i.length)return;
 i.forEach(nnnnnnnn=>{
 const oooooooo=formatMoney(nnnnnnnn.priceInCents);
-const pppppppp=<div class="complementary-product"><img src="${nnnnnnnn.image}" alt="${nnnnnnnn.title}"><div class="complementary-info"><div class="complementary-title">${nnnnnnnn.title}</div><a href="${nnnnnnnn.url}" class="complementary-details">Détails</a><div class="complementary-price">${oooooooo}</div><button class="complementary-add-btn" data-variantid="${nnnnnnnn.variantId}">Ajouter</button></div></div>;
+const pppppppp=`<div class="complementary-product"><img src="${nnnnnnnn.image}" alt="${nnnnnnnn.title}"><div class="complementary-info"><div class="complementary-title">${nnnnnnnn.title}</div><a href="${nnnnnnnn.url}" class="complementary-details">Détails</a><div class="complementary-price">${oooooooo}</div><button class="complementary-add-btn" data-variantid="${nnnnnnnn.variantId}">Ajouter</button></div></div>`;
 mmmmmmmm.insertAdjacentHTML('beforeend',pppppppp)});
 mmmmmmmm.querySelectorAll('.complementary-add-btn').forEach(qqqqqqqq=>{qqqqqqqq.addEventListener('click',rrrrrrrr=>{
 const ssssssss=rrrrrrrr.target.getAttribute('data-variantid');addToCart(ssssssss)})})}
@@ -737,7 +868,7 @@ function addToCart(tttttttt){
 fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:tttttttt,quantity:1})}).then(()=>{setTimeout(()=>{updateCart();openDrawer()},500)}).catch(uuuuuuuu=>console.error("Erreur ajout produit complémentaire:",uuuuuuuu))}
 function showErrorMessage(vvvvvvvv){
 let wwwwwwww=document.getElementById('cart-error-message');
-if(!wwwwwwww){wwwwwwww=document.createElement('div');wwwwwwww.id='cart-error-message';wwwwwwww.style.cssText=position: fixed;top: 20px;right: 20px;background: #ff6b6b;color: white;padding: 10px 15px;border-radius: 5px;font-size: 14px;z-index: 100000;opacity: 0;transition: opacity 0.3s ease;;document.body.appendChild(wwwwwwww)}
+if(!wwwwwwww){wwwwwwww=document.createElement('div');wwwwwwww.id='cart-error-message';wwwwwwww.style.cssText=`position: fixed;top: 20px;right: 20px;background: #ff6b6b;color: white;padding: 10px 15px;border-radius: 5px;font-size: 14px;z-index: 100000;opacity: 0;transition: opacity 0.3s ease;`;document.body.appendChild(wwwwwwww)}
 wwwwwwww.textContent=vvvvvvvv;wwwwwwww.style.opacity='1';
 setTimeout(()=>{wwwwwwww.style.opacity='0'},3000)}});
 </script>
