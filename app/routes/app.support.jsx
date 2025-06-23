@@ -13,15 +13,9 @@ export default function SupportPage() {
             </Text>
             <Text variant="bodyMd" as="p">
               📧 Email :{" "}
-              <Link url="mailto:support@tonapp.com" external>
-                support@tonapp.com
+              <Link url="mailto:valentin@checks-studio.com" external>
+                valentin@checks-studio.com
               </Link>
-            </Text>
-            <Text variant="bodyMd" as="p">
-              💬 Chat : disponible dans l’application ou sur notre site
-            </Text>
-            <Text variant="bodyMd" as="p">
-              📚 <Link url="https://tonapp.com/docs" external>Documentation en ligne</Link>
             </Text>
           </Card>
         </Layout.Section>
