@@ -11,7 +11,8 @@ import {
   Banner,
   Text,
   Select,
-  Checkbox
+  Checkbox,
+  InlineStack
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 
@@ -247,7 +248,7 @@ export const action = async ({ request }) => {
 };
 
 // Composant pour gérer une offre
-function OfferForm({ index, settings, onChange }) {
+function OfferForm({ index, settings, onChange, onSave, isSubmitting }) {
   const offerTypes = [
     { label: "Livraison offerte", value: "shipping" },
     { label: "Cadeau offert", value: "gift" }
@@ -264,7 +265,20 @@ function OfferForm({ index, settings, onChange }) {
   const productUrl = settings[`offer${offerNumber}_product_url`];
   
   return (
-    <Card sectioned title={`Offre ${offerNumber}`}>
+    <Card sectioned>
+      <div style={{ marginBottom: "1rem" }}>
+        <InlineStack align="space-between">
+          <Text variant="headingMd" as="h3">Offre {offerNumber}</Text>
+          <Button
+            onClick={onSave}
+            loading={isSubmitting}
+            size="medium"
+          >
+            Enregistrer
+          </Button>
+        </InlineStack>
+      </div>
+      
       <FormLayout>
         <Checkbox
           label={`Activer l'offre ${offerNumber}`}
@@ -345,7 +359,9 @@ export default function OffersSettings() {
   
   // Soumettre le formulaire
   const handleSubmit = (event) => {
-    event.preventDefault();
+    if (event) {
+      event.preventDefault();
+    }
     
     // Préparer les données pour la soumission
     const formData = new FormData();
@@ -383,8 +399,13 @@ export default function OffersSettings() {
   
   return (
     <Page
-      title="Paramètres des offres"
-      subtitle="Configurez les offres à afficher dans votre panier personnalisé"
+      title="Paramètres des offres Panier"
+      subtitle="Configurez les offres à afficher dans votre panier BoostCart"
+      primaryAction={{
+        content: "Enregistrer les offres",
+        onAction: handleSubmit,
+        loading: isSubmitting
+      }}
     >
       {/* Message de statut */}
       {(showStatusMessage || error) && (
@@ -405,6 +426,8 @@ export default function OffersSettings() {
               index={0}
               settings={settings}
               onChange={handleSettingChange}
+              onSave={handleSubmit}
+              isSubmitting={isSubmitting}
             />
           </Layout.Section>
           
@@ -414,6 +437,8 @@ export default function OffersSettings() {
               index={1}
               settings={settings}
               onChange={handleSettingChange}
+              onSave={handleSubmit}
+              isSubmitting={isSubmitting}
             />
           </Layout.Section>
           
@@ -423,21 +448,9 @@ export default function OffersSettings() {
               index={2}
               settings={settings}
               onChange={handleSettingChange}
+              onSave={handleSubmit}
+              isSubmitting={isSubmitting}
             />
-          </Layout.Section>
-          
-          <Layout.Section>
-            <Card sectioned>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <Button
-                  primary
-                  submit
-                  loading={isSubmitting}
-                >
-                  Enregistrer les offres
-                </Button>
-              </div>
-            </Card>
           </Layout.Section>
         </Layout>
       </Form>
