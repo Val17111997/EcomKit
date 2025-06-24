@@ -12,8 +12,15 @@ import {
   Text,
   Select,
   Checkbox,
-  InlineStack
+  InlineStack,
+  Tabs,
+  Box,
+  List,
+  Icon,
+  Collapsible,
+  Link
 } from "@shopify/polaris";
+import { CheckSmallIcon, InfoIcon } from '@shopify/polaris-icons';
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
@@ -247,8 +254,212 @@ export const action = async ({ request }) => {
   }
 };
 
+// Composant Guide de personnalisation
+function CustomizationGuide() {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
+  
+  return (
+    <Card sectioned>
+      <InlineStack align="space-between" blockAlign="center">
+        <div>
+          <Text variant="headingMd" as="h2">
+            Étape 3 : Personnalisez l'affichage
+          </Text>
+          <Text variant="bodyMd" color="subdued">
+            Découvrez comment personnaliser l'affichage et sélectionner vos produits complémentaires
+          </Text>
+        </div>
+        <Button onClick={handleToggle} plain>
+          {isOpen ? "Masquer" : "Afficher"} le guide
+        </Button>
+      </InlineStack>
+      
+      <Collapsible open={isOpen} id="customization-guide">
+        <Box paddingBlockStart="4">
+          <div style={{ marginBottom: "1rem" }}>
+            <Text variant="headingMd" as="h3">Comment personnaliser votre BoostCart ?</Text>
+          </div>
+          
+          <List type="number">
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Styles et couleurs :</strong> Adaptez l'apparence de votre progress bar aux couleurs de votre marque
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Messages personnalisés :</strong> Rédigez des messages engageants qui incitent à l'achat
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Produits complémentaires :</strong> Sélectionnez les produits à proposer en cadeau selon vos objectifs
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Position et timing :</strong> Définissez où et quand afficher votre progress bar pour un impact maximal
+              </Text>
+            </List.Item>
+          </List>
+          
+          <Box paddingBlockStart="4">
+            <img 
+              src="/etape-3-boostcart.jpg"
+              alt="Guide de personnalisation BoostCart"
+              style={{ maxWidth: "300px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            />
+          </Box>
+          
+          <Box paddingBlockStart="4">
+            <Button 
+              url="shopify:admin/themes/current/editor?context=apps"
+              external
+              variant="primary"
+            >
+              Personnaliser l'affichage
+            </Button>
+          </Box>
+        </Box>
+      </Collapsible>
+    </Card>
+  );
+}
+
+// Composant Guide d'activation
+function ActivationGuide() {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
+  
+  return (
+    <Card sectioned>
+      <InlineStack align="space-between" blockAlign="center">
+        <div>
+          <Text variant="headingMd" as="h2">
+            Étape 1 : Activez l'extension dans votre thème Shopify
+          </Text>
+          <Text variant="bodyMd" color="subdued">
+            Découvrez comment activer le panier BoostCart
+          </Text>
+        </div>
+        <Button onClick={handleToggle} plain>
+          {isOpen ? "Masquer" : "Afficher"} le guide
+        </Button>
+      </InlineStack>
+      
+      <Collapsible open={isOpen} id="activation-guide">
+        <Box paddingBlockStart="4">
+          <div style={{ marginBottom: "1rem" }}>
+            <Text variant="headingMd" as="h3">Comment activer BoostCart dans votre thème ?</Text>
+          </div>
+          
+          <List type="number">
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Accédez à votre admin Shopify :</strong> Allez dans "Boutique en ligne" → "Thèmes"
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Personnalisez votre thème :</strong> Cliquez sur "Personnaliser" à côté de votre thème actif
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Ajoutez l'extension :</strong> Dans l'éditeur de thème, allez dans "Extensions d'applications" et activez "BoostCart"
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Enregistrez :</strong> Cliquez sur "Enregistrer" pour publier les modifications
+              </Text>
+            </List.Item>
+          </List>
+          
+          <Box paddingBlockStart="4">
+            <img 
+              src="/etape-1-boostcart.jpg"
+              alt="Guide d'activation BoostCart"
+              style={{ maxWidth: "300px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            />
+          </Box>
+          
+          <Box paddingBlockStart="4">
+            <Button 
+              url="shopify:admin/themes/current/editor?context=apps"
+              external
+              variant="primary"
+            >
+              Personnaliser le thème
+            </Button>
+          </Box>
+        </Box>
+      </Collapsible>
+    </Card>
+  );
+}
+
+// Composant Guide de démarrage
+function StartupGuide() {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
+  
+  return (
+    <Card sectioned>
+      <InlineStack align="space-between" blockAlign="center">
+        <div>
+          <Text variant="headingMd" as="h2">
+            Étape 2 : Configurez vos offres paniers pour la Progress Bar
+          </Text>
+          <Text variant="bodyMd" color="subdued">
+            Découvrez comment configurer vos offres BoostCart
+          </Text>
+        </div>
+        <Button onClick={handleToggle} plain>
+          {isOpen ? "Masquer" : "Afficher"} le guide
+        </Button>
+      </InlineStack>
+      
+      <Collapsible open={isOpen} id="startup-guide">
+        <Box paddingBlockStart="4">
+          <div style={{ marginBottom: "1rem" }}>
+            <Text variant="headingMd" as="h3">Comment créer des offres efficaces ?</Text>
+          </div>
+          
+          <List type="number">
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Choisissez le type d'offre :</strong> Livraison offerte (pour encourager les achats) ou Cadeau offert (pour augmenter la valeur perçue)
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Définissez des seuils progressifs :</strong> Ex: 50€, 75€, 100€ pour créer un effet d'escalier
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Personnalisez vos messages :</strong> Utilisez <code>[amount_left]</code> pour afficher le montant restant
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Pour les cadeaux :</strong> Ajoutez l'URL du produit (ex: /products/echantillon-gratuit)
+              </Text>
+            </List.Item>
+          </List>
+        </Box>
+      </Collapsible>
+    </Card>
+  );
+}
+
 // Composant pour gérer une offre
-function OfferForm({ index, settings, onChange, onSave, isSubmitting }) {
+function OfferForm({ index, settings, onChange }) {
   const offerTypes = [
     { label: "Livraison offerte", value: "shipping" },
     { label: "Cadeau offert", value: "gift" }
@@ -265,20 +476,7 @@ function OfferForm({ index, settings, onChange, onSave, isSubmitting }) {
   const productUrl = settings[`offer${offerNumber}_product_url`];
   
   return (
-    <Card sectioned>
-      <div style={{ marginBottom: "1rem" }}>
-        <InlineStack align="space-between">
-          <Text variant="headingMd" as="h3">Offre {offerNumber}</Text>
-          <Button
-            onClick={onSave}
-            loading={isSubmitting}
-            size="medium"
-          >
-            Enregistrer
-          </Button>
-        </InlineStack>
-      </div>
-      
+    <div style={{ padding: "1rem 0" }}>
       <FormLayout>
         <Checkbox
           label={`Activer l'offre ${offerNumber}`}
@@ -308,6 +506,7 @@ function OfferForm({ index, settings, onChange, onSave, isSubmitting }) {
           onChange={(value) => onChange(`offer${offerNumber}_text_before`, value)}
           helpText="Utilisez [amount_left] pour afficher le montant restant"
           disabled={!enabled}
+          multiline={2}
         />
         
         <TextField
@@ -315,6 +514,7 @@ function OfferForm({ index, settings, onChange, onSave, isSubmitting }) {
           value={textAfter}
           onChange={(value) => onChange(`offer${offerNumber}_text_after`, value)}
           disabled={!enabled}
+          multiline={2}
         />
         
         {type === "gift" && (
@@ -327,8 +527,19 @@ function OfferForm({ index, settings, onChange, onSave, isSubmitting }) {
             disabled={!enabled}
           />
         )}
+        
+        {enabled && (
+          <Banner status="info">
+            <InlineStack gap="2" blockAlign="center">
+              <Icon source={CheckSmallIcon} />
+              <Text variant="bodyMd">
+                <strong>Aperçu :</strong> Cette offre sera activée quand le panier atteindra {threshold}€
+              </Text>
+            </InlineStack>
+          </Banner>
+        )}
       </FormLayout>
-    </Card>
+    </div>
   );
 }
 
@@ -341,6 +552,12 @@ export default function OffersSettings() {
   
   // État local pour les settings
   const [settings, setSettings] = useState(offersSettings || {});
+  
+  // État pour les onglets
+  const [selectedTab, setSelectedTab] = useState(0);
+  
+  // État pour la section configuration
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   
   // Mise à jour des settings si les données chargées changent
   useEffect(() => {
@@ -391,18 +608,43 @@ export default function OffersSettings() {
       
       const timer = setTimeout(() => {
         setShowStatusMessage(false);
-      }, 3000);
+      }, 5000);
       
       return () => clearTimeout(timer);
     }
   }, [actionData]);
+  
+  // Configuration des onglets
+  const tabs = [
+    {
+      id: 'offer1',
+      content: 'Offre 1',
+      panelID: 'offer1-panel',
+    },
+    {
+      id: 'offer2',
+      content: 'Offre 2',
+      panelID: 'offer2-panel',
+    },
+    {
+      id: 'offer3',
+      content: 'Offre 3',
+      panelID: 'offer3-panel',
+    },
+  ];
+  
+  const handleTabChange = useCallback((selectedTabIndex) => {
+    setSelectedTab(selectedTabIndex);
+  }, []);
+  
+  const handleConfigToggle = useCallback(() => setIsConfigOpen(!isConfigOpen), [isConfigOpen]);
   
   return (
     <Page
       title="Paramètres des offres Panier"
       subtitle="Configurez les offres à afficher dans votre panier BoostCart"
       primaryAction={{
-        content: "Enregistrer les offres",
+        content: "Enregistrer toutes les offres",
         onAction: handleSubmit,
         loading: isSubmitting
       }}
@@ -418,42 +660,191 @@ export default function OffersSettings() {
         </div>
       )}
       
-      <Form method="post" onSubmit={handleSubmit}>
-        <Layout>
-          {/* Offre 1 */}
-          <Layout.Section>
-            <OfferForm
-              index={0}
-              settings={settings}
-              onChange={handleSettingChange}
-              onSave={handleSubmit}
-              isSubmitting={isSubmitting}
-            />
-          </Layout.Section>
-          
-          {/* Offre 2 */}
-          <Layout.Section>
-            <OfferForm
-              index={1}
-              settings={settings}
-              onChange={handleSettingChange}
-              onSave={handleSubmit}
-              isSubmitting={isSubmitting}
-            />
-          </Layout.Section>
-          
-          {/* Offre 3 */}
-          <Layout.Section>
-            <OfferForm
-              index={2}
-              settings={settings}
-              onChange={handleSettingChange}
-              onSave={handleSubmit}
-              isSubmitting={isSubmitting}
-            />
-          </Layout.Section>
-        </Layout>
-      </Form>
+      <Layout>
+        {/* Guide d'activation */}
+        <Layout.Section>
+          <ActivationGuide />
+        </Layout.Section>
+        
+        {/* Guide de démarrage */}
+        <Layout.Section>
+          <StartupGuide />
+        </Layout.Section>
+        
+        {/* Configuration des offres */}
+        <Layout.Section>
+          <Card sectioned>
+            <InlineStack align="space-between" blockAlign="center">
+              <div>
+                <Text variant="headingMd" as="h2">
+                  Configuration des offres
+                </Text>
+                <Text variant="bodyMd" color="subdued">
+                  Configurez jusqu'à 3 offres progressives pour votre panier
+                </Text>
+              </div>
+              <Button onClick={handleConfigToggle} plain>
+                {isConfigOpen ? "Masquer" : "Afficher"} la configuration
+              </Button>
+            </InlineStack>
+            
+            <Collapsible open={isConfigOpen} id="offers-config">
+              <Box paddingBlockStart="4">
+                {/* Barre de contrôle des offres */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: '24px',
+                  padding: '16px',
+                  backgroundColor: '#F6F6F7',
+                  borderRadius: '12px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#202223' }}>Offre 1</span>
+                    <div 
+                      style={{
+                        width: '44px',
+                        height: '24px',
+                        backgroundColor: settings.enable_offer1 ? '#00A651' : '#E1E3E5',
+                        borderRadius: '12px',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => handleSettingChange('enable_offer1', !settings.enable_offer1)}
+                    >
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: 'white',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '2px',
+                        left: settings.enable_offer1 ? '22px' : '2px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}></div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ color: '#D1D5DB', fontSize: '18px', fontWeight: '300' }}>⏐</div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#202223' }}>Offre 2</span>
+                    <div 
+                      style={{
+                        width: '44px',
+                        height: '24px',
+                        backgroundColor: settings.enable_offer2 ? '#00A651' : '#E1E3E5',
+                        borderRadius: '12px',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => handleSettingChange('enable_offer2', !settings.enable_offer2)}
+                    >
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: 'white',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '2px',
+                        left: settings.enable_offer2 ? '22px' : '2px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}></div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ color: '#D1D5DB', fontSize: '18px', fontWeight: '300' }}>⏐</div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#202223' }}>Offre 3</span>
+                    <div 
+                      style={{
+                        width: '44px',
+                        height: '24px',
+                        backgroundColor: settings.enable_offer3 ? '#00A651' : '#E1E3E5',
+                        borderRadius: '12px',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onClick={() => handleSettingChange('enable_offer3', !settings.enable_offer3)}
+                    >
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: 'white',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '2px',
+                        left: settings.enable_offer3 ? '22px' : '2px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}></div>
+                    </div>
+                  </div>
+                </div>
+                
+                <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange}>
+                  <Box padding="4">
+                    <Form method="post" onSubmit={handleSubmit}>
+                      {selectedTab === 0 && (
+                        <OfferForm
+                          index={0}
+                          settings={settings}
+                          onChange={handleSettingChange}
+                        />
+                      )}
+                      {selectedTab === 1 && (
+                        <OfferForm
+                          index={1}
+                          settings={settings}
+                          onChange={handleSettingChange}
+                        />
+                      )}
+                      {selectedTab === 2 && (
+                        <OfferForm
+                          index={2}
+                          settings={settings}
+                          onChange={handleSettingChange}
+                        />
+                      )}
+                      
+                      <Box paddingBlockStart="4">
+                        <InlineStack gap="2">
+                          <Button
+                            submit
+                            primary
+                            loading={isSubmitting}
+                          >
+                            Enregistrer cette offre
+                          </Button>
+                          <Button
+                            onClick={handleSubmit}
+                            loading={isSubmitting}
+                          >
+                            Enregistrer toutes les offres
+                          </Button>
+                        </InlineStack>
+                      </Box>
+                    </Form>
+                  </Box>
+                </Tabs>
+              </Box>
+            </Collapsible>
+          </Card>
+        </Layout.Section>
+        
+        {/* Guide de personnalisation */}
+        <Layout.Section>
+          <CustomizationGuide />
+        </Layout.Section>
+      </Layout>
     </Page>
   );
 }

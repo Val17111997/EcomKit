@@ -19,8 +19,10 @@ export default function App() {
     <AppProvider isEmbeddedApp apiKey={apiKey}>
       <NavMenu>
         <Link to="/app" rel="home">Home</Link>
-        <Link to="/app/offers-settings">Offres BoostCart</Link>
+        <Link to="/app/offers-settings">Set-up BoostCart</Link>
+        <Link to="/app/setup-bundlecard">Set-up Bundle-Card</Link>
         <Link to="/app/support">Support client</Link>
+        <Link to="/app/plans">Plans & Facturation</Link>
       </NavMenu>
       <Outlet />
     </AppProvider>
