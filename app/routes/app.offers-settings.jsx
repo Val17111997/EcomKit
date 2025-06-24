@@ -306,14 +306,6 @@ function CustomizationGuide() {
           </List>
           
           <Box paddingBlockStart="4">
-            <img 
-              src="/etape-3-boostcart.jpg"
-              alt="Guide de personnalisation BoostCart"
-              style={{ maxWidth: "300px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
-            />
-          </Box>
-          
-          <Box paddingBlockStart="4">
             <Button 
               url="shopify:admin/themes/current/editor?context=apps"
               external
@@ -378,14 +370,6 @@ function ActivationGuide() {
               </Text>
             </List.Item>
           </List>
-          
-          <Box paddingBlockStart="4">
-            <img 
-              src="/etape-1-boostcart.jpg"
-              alt="Guide d'activation BoostCart"
-              style={{ maxWidth: "300px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
-            />
-          </Box>
           
           <Box paddingBlockStart="4">
             <Button 
