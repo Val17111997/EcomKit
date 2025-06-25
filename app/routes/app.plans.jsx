@@ -2,16 +2,12 @@
 import { json } from "@remix-run/node";
 import { Page, Layout, Card, Text, Button } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { Redirect } from "@shopify/app-bridge/actions";
 
 export const loader = async () => {
   return json({ success: true });
 };
 
 export default function PlansPage() {
-  const app = useAppBridge();
-
   const handleRedirectToPricing = () => {
     // URL exacte qui fonctionne manuellement
     const pricingUrl = "https://admin.shopify.com/store/ecomkit-demo/charges/ecom-kit-2/pricing_plans";
@@ -19,22 +15,17 @@ export default function PlansPage() {
     console.log("Redirection vers:", pricingUrl);
     
     try {
-      // Méthode 1: App Bridge (recommandée)
-      const redirect = Redirect.create(app);
-      redirect.dispatch(Redirect.Action.REMOTE, {
-        url: pricingUrl,
-        newContext: true
-      });
-      console.log("App Bridge redirect lancé");
-    } catch (error) {
-      console.log("App Bridge failed, using window redirect", error);
-      
-      // Méthode 2: Redirection directe
+      // Méthode simple et fiable: Redirection directe
       if (window.top) {
         window.top.location.href = pricingUrl;
       } else {
         window.location.href = pricingUrl;
       }
+      console.log("Redirection lancée");
+    } catch (error) {
+      console.log("Erreur de redirection:", error);
+      // Fallback
+      window.open(pricingUrl, '_blank');
     }
   };
 
