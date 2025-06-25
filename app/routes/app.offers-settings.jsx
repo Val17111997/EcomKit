@@ -18,7 +18,8 @@ import {
   List,
   Icon,
   Collapsible,
-  Link
+  Link,
+  Image
 } from "@shopify/polaris";
 import { CheckSmallIcon, InfoIcon } from '@shopify/polaris-icons';
 import { authenticate } from "../shopify.server";
@@ -306,6 +307,15 @@ function CustomizationGuide() {
           </List>
           
           <Box paddingBlockStart="4">
+            <Image
+              source="/images/etape-3-BoostCart.jpg"
+              alt="Guide de personnalisation BoostCart"
+              width={300}
+              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            />
+          </Box>
+          
+          <Box paddingBlockStart="4">
             <Button 
               url="shopify:admin/themes/current/editor?context=apps"
               external
@@ -370,6 +380,15 @@ function ActivationGuide() {
               </Text>
             </List.Item>
           </List>
+          
+          <Box paddingBlockStart="4">
+            <Image
+              source="/images/etape-1-BoostCart.jpg"
+              alt="Guide d'activation BoostCart"
+              width={300}
+              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            />
+          </Box>
           
           <Box paddingBlockStart="4">
             <Button 

@@ -3,7 +3,7 @@
 client_id = "12cef638ec0c369730c3c21c3372f0c9"
 name = "ecom-kit"
 handle = "ecom-kit-2"
-application_url = "https://synthetic-alliance-canberra-static.trycloudflare.com"
+application_url = "https://browsing-wool-civil-fu.trycloudflare.com"
 embedded = true
 
 [build]
@@ -19,9 +19,9 @@ scopes = ""
 
 [auth]
 redirect_urls = [
-  "https://synthetic-alliance-canberra-static.trycloudflare.com/auth/callback",
-  "https://synthetic-alliance-canberra-static.trycloudflare.com/auth/shopify/callback",
-  "https://synthetic-alliance-canberra-static.trycloudflare.com/api/auth/callback"
+  "https://browsing-wool-civil-fu.trycloudflare.com/auth/callback",
+  "https://browsing-wool-civil-fu.trycloudflare.com/auth/shopify/callback",
+  "https://browsing-wool-civil-fu.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
