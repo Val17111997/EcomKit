@@ -28,8 +28,8 @@ export const loader = async ({ request }) => {
   const { admin, session } = await authenticate.admin(request);
   
   try {
-    // Structure par défaut pour les cartes Bundle
-    let bundleSettings = {
+    // Structure par défaut pour Ultimate Pack
+    let ultimatePackSettings = {
       // Produit principal
       pack_product: "",
       default_variant_index: 1,
@@ -66,11 +66,11 @@ export const loader = async ({ request }) => {
     const shopData = await shopResponse.json();
     const shopId = shopData.data?.shop?.id;
     
-    // Récupérer tous les metafields dans le namespace "bundlecards"
+    // Récupérer tous les metafields dans le namespace "ultimatepack"
     const metafieldsResponse = await admin.graphql(`
       query {
         shop {
-          metafields(namespace: "bundlecards", first: 100) {
+          metafields(namespace: "ultimatepack", first: 100) {
             edges {
               node {
                 id
@@ -93,17 +93,17 @@ export const loader = async ({ request }) => {
       // Traiter les valeurs selon leur type
       switch (key) {
         case 'default_variant_index':
-          bundleSettings[key] = parseInt(value);
+          ultimatePackSettings[key] = parseInt(value);
           break;
           
         default:
-          bundleSettings[key] = value;
+          ultimatePackSettings[key] = value;
           break;
       }
     });
     
     return json({
-      bundleSettings,
+      ultimatePackSettings,
       shopId,
       currentTimestamp: new Date().toISOString()
     });
@@ -128,7 +128,7 @@ export const action = async ({ request }) => {
       settings[key] = value;
     }
     
-    console.log("Paramètres Bundle à enregistrer:", settings);
+    console.log("Paramètres Ultimate Pack à enregistrer:", settings);
     
     // Obtenir l'ID de la boutique
     const shopResponse = await admin.graphql(`
@@ -165,7 +165,7 @@ export const action = async ({ request }) => {
       }
       
       metafields.push({
-        namespace: "bundlecards",
+        namespace: "ultimatepack",
         key,
         type,
         value: String(value),
@@ -173,7 +173,7 @@ export const action = async ({ request }) => {
       });
     }
     
-    console.log("Metafields Bundle à enregistrer:", metafields);
+    console.log("Metafields Ultimate Pack à enregistrer:", metafields);
     
     // Si aucun metafield à enregistrer, retourner succès
     if (metafields.length === 0) {
@@ -220,7 +220,7 @@ export const action = async ({ request }) => {
       const responseData = await response.json();
       results.push(responseData);
       
-      console.log("Réponse GraphQL Bundle:", responseData);
+      console.log("Réponse GraphQL Ultimate Pack:", responseData);
       
       // Vérifier les erreurs
       if (responseData.data?.metafieldsSet?.userErrors?.length > 0) {
@@ -231,12 +231,12 @@ export const action = async ({ request }) => {
     
     return json({
       success: true,
-      message: "Cartes Bundle enregistrées avec succès!",
+      message: "Ultimate Pack enregistré avec succès!",
       settings
     });
     
   } catch (error) {
-    console.error("Erreur d'enregistrement Bundle:", error);
+    console.error("Erreur d'enregistrement Ultimate Pack:", error);
     return json({
       success: false,
       message: `Une erreur est survenue lors de l'enregistrement: ${error.message}`
@@ -244,8 +244,8 @@ export const action = async ({ request }) => {
   }
 };
 
-// Composant Guide de création de produit
-function ProductCreationGuide() {
+// Composant Guide d'ajout d'extension
+function ExtensionGuide() {
   const [isOpen, setIsOpen] = useState(false);
   
   const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
@@ -255,10 +255,10 @@ function ProductCreationGuide() {
       <InlineStack align="space-between" blockAlign="center">
         <div>
           <Text variant="headingMd" as="h2">
-            Étape 1 : Créez votre produit avec vos variantes en lots
+            Étape 1 : Ajoutez l'extension sur votre thème Shopify
           </Text>
           <Text variant="bodyMd" color="subdued">
-            Rendez-vous dans Shopify - Produits
+            Découvrez comment ajouter Ultimate Pack dans votre thème
           </Text>
         </div>
         <Button onClick={handleToggle} plain>
@@ -266,85 +266,10 @@ function ProductCreationGuide() {
         </Button>
       </InlineStack>
       
-      <Collapsible open={isOpen} id="product-creation-guide">
+      <Collapsible open={isOpen} id="extension-guide">
         <Box paddingBlockStart="4">
           <div style={{ marginBottom: "1rem" }}>
-            <Text variant="headingMd" as="h3">Comment créer un produit avec des variantes en lots ?</Text>
-          </div>
-          
-          <List type="number">
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Accédez à vos produits :</strong> Allez dans "Produits" dans votre admin Shopify
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Créez un nouveau produit :</strong> Cliquez sur "Ajouter un produit"
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Ajoutez des variantes :</strong> Créez différentes variantes (ex: Pack de 1, Pack de 3, Pack de 5)
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Configurez les prix :</strong> Définissez des prix dégressifs pour encourager les achats en lot
-              </Text>
-            </List.Item>
-          </List>
-          
-          <Box paddingBlockStart="4">
-            <Image
-              source="/images/etape-1-BundleCard.jpg"
-              alt="Guide de création de produit Bundle Card"
-              width={300}
-              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
-            />
-          </Box>
-          
-          <Box paddingBlockStart="4">
-            <Button 
-              url="shopify:admin/products"
-              external
-              variant="primary"
-            >
-              Gérer mes produits
-            </Button>
-          </Box>
-        </Box>
-      </Collapsible>
-    </Card>
-  );
-}
-
-// Composant Guide d'activation
-function ActivationGuide() {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
-  
-  return (
-    <Card sectioned>
-      <InlineStack align="space-between" blockAlign="center">
-        <div>
-          <Text variant="headingMd" as="h2">
-            Étape 2 : Activez l'extension dans votre thème Shopify
-          </Text>
-          <Text variant="bodyMd" color="subdued">
-            Découvrez comment activer les cartes Bundle dans votre thème
-          </Text>
-        </div>
-        <Button onClick={handleToggle} plain>
-          {isOpen ? "Masquer" : "Afficher"} le guide
-        </Button>
-      </InlineStack>
-      
-      <Collapsible open={isOpen} id="activation-guide">
-        <Box paddingBlockStart="4">
-          <div style={{ marginBottom: "1rem" }}>
-            <Text variant="headingMd" as="h3">Comment activer Bundle Cards dans votre thème ?</Text>
+            <Text variant="headingMd" as="h3">Comment ajouter Ultimate Pack dans votre thème ?</Text>
           </div>
           
           <List type="number">
@@ -360,37 +285,15 @@ function ActivationGuide() {
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Créez un template produit :</strong> Créez un template produit pour le produit dont vous souhaitez afficher les variantes en lots
+                <strong>Ajoutez l'extension :</strong> Dans l'éditeur de thème, cliquez sur le + pour ajouter une section
               </Text>
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Ajoutez l'extension :</strong> Dans l'éditeur de thème, cliquez sur le + pour ajouter une section, positionné généralement au dessus des boutons de paiement
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                Cliquez sur Application, puis Bundle Card
+                Cliquez sur Application, puis Ultimate Pack
               </Text>
             </List.Item>
           </List>
-          
-          <Box paddingBlockStart="4">
-            <InlineStack gap="4" align="start">
-              <Image
-                source="/images/etape2bis-BundleCard.jpg"
-                alt="Guide d'activation Bundle Card étape 2 bis"
-                width={300}
-                style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
-              />
-              <Image
-                source="/images/etape-2-BundleCard.jpg"
-                alt="Guide d'activation Bundle Card étape 2"
-                width={300}
-                style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
-              />
-            </InlineStack>
-          </Box>
           
           <Box paddingBlockStart="4">
             <Button 
@@ -407,8 +310,8 @@ function ActivationGuide() {
   );
 }
 
-// Composant Guide de démarrage
-function StartupGuide() {
+// Composant Guide de configuration des produits
+function ProductConfigGuide() {
   const [isOpen, setIsOpen] = useState(false);
   
   const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
@@ -418,10 +321,10 @@ function StartupGuide() {
       <InlineStack align="space-between" blockAlign="center">
         <div>
           <Text variant="headingMd" as="h2">
-            Étape 3 : Configurez vos cartes produits
+            Étape 2 : Choisissez les produits que vous allez proposer en pack et configurez vos offres
           </Text>
           <Text variant="bodyMd" color="subdued">
-            Découvrez comment configurer vos cartes Bundle
+            Configurez vos produits et offres pack dans Ultimate Pack
           </Text>
         </div>
         <Button onClick={handleToggle} plain>
@@ -429,144 +332,56 @@ function StartupGuide() {
         </Button>
       </InlineStack>
       
-      <Collapsible open={isOpen} id="startup-guide">
+      <Collapsible open={isOpen} id="product-config-guide">
         <Box paddingBlockStart="4">
           <div style={{ marginBottom: "1rem" }}>
-            <Text variant="headingMd" as="h3">Comment créer des cartes efficaces ?</Text>
+            <Text variant="headingMd" as="h3">Comment configurer vos produits et offres pack ?</Text>
           </div>
           
           <List type="number">
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Sélectionnez votre produit avec variantes</strong> 
+                <strong>Sélectionnez vos produits :</strong> Choisissez les produits que vous souhaitez proposer en pack
               </Text>
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Personnalisez les titres :</strong> Donnez des noms attractifs à vos packs
+                <strong>Définissez les quantités :</strong> Configurez les différentes quantités pour vos packs (ex: 2, 3, 5 produits)
               </Text>
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Ajoutez des badges :</strong> Mettez en avant des offres alléchantes
+                <strong>Créez vos offres :</strong> Définissez des remises attractives pour encourager l'achat en pack
               </Text>
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Messages de livraison :</strong> Ajoutez la livraison offerte si c'est le cas sur certains packs
+                <strong>Personnalisez l'affichage :</strong> Configurez les titres, badges et messages pour vos packs
               </Text>
             </List.Item>
           </List>
-          
-          <Box paddingBlockStart="4">
-            <Image
-              source="/images/etape-3-Bundlecard.jpg"
-              alt="Guide de configuration Bundle Card étape 3"
-              width={300}
-              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
-            />
-          </Box>
         </Box>
       </Collapsible>
     </Card>
   );
 }
 
-// Composant pour gérer les paramètres d'un pack
-function PackForm({ index, settings, onChange }) {
-  const packNumber = index + 1;
-  
-  // Récupérer les valeurs de ce pack
-  const title = settings[`pack_title_${packNumber}`];
-  const badge = settings[`pack_badge_${packNumber}`];
-  const shipping = settings[`shipping_text_${packNumber}`];
-  
-  return (
-    <div style={{ padding: "1rem 0" }}>
-      <FormLayout>
-        <TextField
-          label={`Titre du Pack ${packNumber}`}
-          value={title}
-          onChange={(value) => onChange(`pack_title_${packNumber}`, value)}
-          placeholder={`Pack ${packNumber}`}
-        />
-        
-        <TextField
-          label={`Badge du Pack ${packNumber}`}
-          value={badge}
-          onChange={(value) => onChange(`pack_badge_${packNumber}`, value)}
-          placeholder="Ex: POPULAIRE, MEILLEURE OFFRE"
-          helpText="Laissez vide si vous ne voulez pas de badge"
-        />
-        
-        <TextField
-          label={`Texte de livraison Pack ${packNumber}`}
-          value={shipping}
-          onChange={(value) => onChange(`shipping_text_${packNumber}`, value)}
-          placeholder="✓ Livraison offerte"
-        />
-        
-        <Banner status="info">
-          <InlineStack gap="2" blockAlign="center">
-            <Icon source={InfoIcon} />
-            <Text variant="bodyMd">
-              <strong>Aperçu :</strong> Ce pack apparaîtra avec le titre "{title}" {badge && `et le badge "${badge}"`}
-            </Text>
-          </InlineStack>
-        </Banner>
-      </FormLayout>
-    </div>
-  );
-}
-
-export default function BundleSetup() {
+export default function UltimatePackSetup() {
   const loaderData = useLoaderData();
-  const { bundleSettings, error } = loaderData;
+  const { ultimatePackSettings, error } = loaderData;
   const actionData = useActionData();
   const navigation = useNavigation();
   const submit = useSubmit();
   
   // État local pour les settings
-  const [settings, setSettings] = useState(bundleSettings || {});
-  
-  // État pour les onglets
-  const [selectedTab, setSelectedTab] = useState(0);
-  
-  // État pour la section configuration
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [settings, setSettings] = useState(ultimatePackSettings || {});
   
   // Mise à jour des settings si les données chargées changent
   useEffect(() => {
-    if (bundleSettings) {
-      setSettings(bundleSettings);
+    if (ultimatePackSettings) {
+      setSettings(ultimatePackSettings);
     }
-  }, [bundleSettings]);
-  
-  // Mettre à jour un champ
-  const handleSettingChange = (key, value) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-  
-  // Soumettre le formulaire
-  const handleSubmit = (event) => {
-    if (event) {
-      event.preventDefault();
-    }
-    
-    // Préparer les données pour la soumission
-    const formData = new FormData();
-    
-    // Ajouter chaque paramètre au formData
-    Object.entries(settings).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
-    
-    // Soumettre le formulaire
-    submit(formData, { method: "post", replace: true });
-  };
+  }, [ultimatePackSettings]);
   
   // Détermine si le formulaire est en cours de soumission
   const isSubmitting = navigation.state === "submitting";
@@ -590,35 +405,10 @@ export default function BundleSetup() {
     }
   }, [actionData]);
   
-  // Configuration des onglets
-  const tabs = [
-    {
-      id: 'pack1',
-      content: 'Pack 1',
-      panelID: 'pack1-panel',
-    },
-    {
-      id: 'pack2',
-      content: 'Pack 2',
-      panelID: 'pack2-panel',
-    },
-    {
-      id: 'pack3',
-      content: 'Pack 3',
-      panelID: 'pack3-panel',
-    },
-  ];
-  
-  const handleTabChange = useCallback((selectedTabIndex) => {
-    setSelectedTab(selectedTabIndex);
-  }, []);
-  
-  const handleConfigToggle = useCallback(() => setIsConfigOpen(!isConfigOpen), [isConfigOpen]);
-  
   return (
     <Page
-      title="Paramètres des Cartes Bundle"
-      subtitle="Configurez l'affichage de vos variantes produits sous forme de cartes"
+      title="Setup Ultimate Pack"
+      subtitle="Configurez l'extension Ultimate Pack pour vos produits"
     >
       {/* Message de statut */}
       {(showStatusMessage || error) && (
@@ -632,19 +422,35 @@ export default function BundleSetup() {
       )}
       
       <Layout>
-        {/* Guide de création de produit */}
+        {/* Guide d'ajout d'extension */}
         <Layout.Section>
-          <ProductCreationGuide />
+          <ExtensionGuide />
         </Layout.Section>
         
-        {/* Guide d'activation */}
+        {/* Guide de configuration des produits */}
         <Layout.Section>
-          <ActivationGuide />
+          <ProductConfigGuide />
         </Layout.Section>
         
-        {/* Guide de démarrage */}
+        {/* Vidéo tutoriel */}
         <Layout.Section>
-          <StartupGuide />
+          <div style={{ marginTop: "24px" }}>
+            <video 
+              width="500" 
+              height="auto" 
+              controls
+              preload="metadata"
+              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            >
+              <source src="/videos/tuto2.mp4" type="video/mp4" />
+              Votre navigateur ne supporte pas la lecture vidéo.
+            </video>
+          </div>
+        </Layout.Section>
+        
+        {/* Espacement en bas de page */}
+        <Layout.Section>
+          <div style={{ height: "80px" }}></div>
         </Layout.Section>
       </Layout>
     </Page>
