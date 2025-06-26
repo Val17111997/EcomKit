@@ -18,7 +18,8 @@ import {
   List,
   Icon,
   Collapsible,
-  Link
+  Link,
+  Image
 } from "@shopify/polaris";
 import { CheckSmallIcon, InfoIcon } from '@shopify/polaris-icons';
 import { authenticate } from "../shopify.server";
@@ -295,6 +296,15 @@ function ProductCreationGuide() {
           </List>
           
           <Box paddingBlockStart="4">
+            <Image
+              source="/images/etape-1-BundleCard.jpg"
+              alt="Guide de création de produit Bundle Card"
+              width={300}
+              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            />
+          </Box>
+          
+          <Box paddingBlockStart="4">
             <Button 
               url="shopify:admin/products"
               external
@@ -350,7 +360,12 @@ function ActivationGuide() {
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Ajoutez l'extension :</strong> Dans l'éditeur de thème, cliquez sur le + pour ajouter une section
+                <strong>Créez un template produit :</strong> Créez un template produit pour le produit dont vous souhaitez afficher les variantes en lots
+              </Text>
+            </List.Item>
+            <List.Item>
+              <Text variant="bodyMd">
+                <strong>Ajoutez l'extension :</strong> Dans l'éditeur de thème, cliquez sur le + pour ajouter une section, positionné généralement au dessus des boutons de paiement
               </Text>
             </List.Item>
             <List.Item>
@@ -360,7 +375,7 @@ function ActivationGuide() {
             </List.Item>
           </List>
           
-          <Box paddingBlockStart="4">
+          <div style={{ marginTop: "24px" }}>
             <Button 
               url="shopify:admin/themes/current/editor?context=apps"
               external
@@ -368,7 +383,20 @@ function ActivationGuide() {
             >
               Personnaliser le thème
             </Button>
-          </Box>
+          </div>
+          
+          <div style={{ marginTop: "24px" }}>
+            <video 
+              width="500" 
+              height="auto" 
+              controls
+              preload="metadata"
+              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            >
+              <source src="/videos/tuto1.mp4" type="video/mp4" />
+              Votre navigateur ne supporte pas la lecture vidéo.
+            </video>
+          </div>
         </Box>
       </Collapsible>
     </Card>
@@ -406,7 +434,7 @@ function StartupGuide() {
           <List type="number">
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Sélectionnez vos produits :</strong> Choisissez des produits avec plusieurs variantes
+                <strong>Sélectionnez votre produit avec variantes</strong> 
               </Text>
             </List.Item>
             <List.Item>
@@ -416,15 +444,24 @@ function StartupGuide() {
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Ajoutez des badges :</strong> Mettez en avant vos meilleures offres
+                <strong>Ajoutez des badges :</strong> Mettez en avant des offres alléchantes
               </Text>
             </List.Item>
             <List.Item>
               <Text variant="bodyMd">
-                <strong>Messages de livraison :</strong> Ajoutez des informations rassurantes
+                <strong>Messages de livraison :</strong> Ajoutez la livraison offerte si c'est le cas sur certains packs
               </Text>
             </List.Item>
           </List>
+          
+          <Box paddingBlockStart="4">
+            <Image
+              source="/images/etape-3-Bundlecard.jpg"
+              alt="Guide de configuration Bundle Card étape 3"
+              width={300}
+              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
+            />
+          </Box>
         </Box>
       </Collapsible>
     </Card>
@@ -604,6 +641,11 @@ export default function BundleSetup() {
         {/* Guide de démarrage */}
         <Layout.Section>
           <StartupGuide />
+        </Layout.Section>
+        
+        {/* Espacement en bas de page */}
+        <Layout.Section>
+          <div style={{ height: "80px" }}></div>
         </Layout.Section>
       </Layout>
     </Page>

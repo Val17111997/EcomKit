@@ -455,6 +455,14 @@ function StartupGuide() {
               </Text>
             </List.Item>
           </List>
+          
+          <Box paddingBlockStart="4">
+            <Banner status="info">
+              <Text variant="bodyMd">
+                <strong>💡 Astuce pour les produits offerts :</strong> Créez un produit avec le nom du produit suivi de "offert" (ex: "Magnésium marin offert"), définissez le prix à 0€ et renseignez le prix avant réduction (ex: prix avant réduction 14€, prix final 0€). Cela permettra d'afficher la valeur du cadeau tout en l'offrant gratuitement.
+              </Text>
+            </Banner>
+          </Box>
         </Box>
       </Collapsible>
     </Card>
