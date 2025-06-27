@@ -660,15 +660,25 @@ export default function OffersSettings() {
         loading: isSubmitting
       }}
     >
+      {/* Bannière */}
+      <Box paddingBlockEnd="6">
+        <Image
+          source="/images/banniere-boostcart.png"
+          alt="BoostCart"
+          width="100%"
+          style={{ borderRadius: "8px" }}
+        />
+      </Box>
+      
       {/* Message de statut */}
       {(showStatusMessage || error) && (
-        <div style={{ marginBottom: "16px" }}>
+        <Box paddingBlockEnd="4">
           <Banner
             status={isSuccess ? "success" : "critical"}
           >
             {error || statusMessage}
           </Banner>
-        </div>
+        </Box>
       )}
       
       <Layout>

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher, Link } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -9,9 +9,7 @@ import {
   BlockStack,
   Box,
   List,
-  Link,
   InlineStack,
-  Badge,
   Icon,
   Divider,
 } from "@shopify/polaris";
@@ -46,10 +44,10 @@ export default function Index() {
         "Messages d'annonce personnalisés",
         "Design entièrement personnalisable"
       ],
-      status: "active"
+      configUrl: "/app/offers-settings"
     },
     {
-      id: "bundle",
+      id: "packbuilder",
       name: "Pack Builder",
       description: "Créateur de packs avec sélection de variantes",
       features: [
@@ -60,11 +58,11 @@ export default function Index() {
         "Propriétés de panier personnalisées",
         "Messages de validation configurables"
       ],
-      status: "active"
+      configUrl: "/app/setup-packbuilder"
     },
     {
-      id: "pack-cartes",
-      name: "Pack Bundle-card",
+      id: "bundle-cards",
+      name: "Bundle Cards",
       description: "Affichage des variantes sous forme de cartes élégantes",
       features: [
         "Cartes visuelles pour chaque variante",
@@ -74,11 +72,11 @@ export default function Index() {
         "Sélection par défaut configurable",
         "Design responsive et moderne"
       ],
-      status: "active"
+      configUrl: "/app/setup-bundlecard"
     },
     {
-      id: "packbuilder",
-      name: "Ultimate pack",
+      id: "ultimate-pack",
+      name: "Ultimate Pack",
       description: "Constructeur de pack interactif avec paliers de réduction",
       features: [
         "Interface de construction de pack intuitive",
@@ -88,14 +86,9 @@ export default function Index() {
         "Groupage intelligent dans le panier",
         "Optimisé mobile avec animations"
       ],
-      status: "active"
+      configUrl: "/app/setup-ultimatepack"
     }
   ];
-
-  const stats = {
-    totalExtensions: extensions.length,
-    activeExtensions: extensions.filter(ext => ext.status === "active").length
-  };
 
   return (
     <Page>
@@ -113,9 +106,6 @@ export default function Index() {
                     <Text as="h1" variant="headingLg">
                       Bienvenue dans Ecomkit 🚀
                     </Text>
-                    <InlineStack gap="200">
-                      <Badge tone="success">{stats.activeExtensions} actives</Badge>
-                    </InlineStack>
                   </InlineStack>
                   <Text variant="bodyLg" as="p" tone="subdued">
                     Votre suite d'extensions pour optimiser l'expérience d'achat et booster vos conversions
@@ -123,35 +113,6 @@ export default function Index() {
                 </BlockStack>
                 
                 <Divider />
-                
-                <Box padding="400">
-                  <BlockStack gap="300">
-                    <Text as="h3" variant="headingMd" alignment="left">
-                      Découvrez votre guide d'installation :
-                    </Text>
-                    <div style={{
-                      position: 'relative',
-                      paddingBottom: '56.25%',
-                      height: 0,
-                      overflow: 'hidden',
-                      borderRadius: '8px'
-                    }}>
-                      <iframe
-                        src="https://www.youtube.com/embed/q_MxGoIKWJ0"
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          border: 'none'
-                        }}
-                        allowFullScreen
-                        title="Présentation Ecomkit"
-                      />
-                    </div>
-                  </BlockStack>
-                </Box>
               </BlockStack>
             </Card>
           </Layout.Section>
@@ -177,7 +138,6 @@ export default function Index() {
                             <Text as="h3" variant="headingMd">{extension.name}</Text>
                           </BlockStack>
                         </InlineStack>
-                        <Badge tone="success">Actif</Badge>
                       </InlineStack>
                       
                       <Text variant="bodyMd" tone="subdued">
@@ -192,6 +152,15 @@ export default function Index() {
                           ))}
                         </List>
                       </BlockStack>
+                      
+                      {/* Bouton de configuration */}
+                      <Box paddingBlockStart="300">
+                        <Link to={extension.configUrl} style={{ textDecoration: 'none' }}>
+                          <Button variant="primary" size="medium">
+                            Configurer
+                          </Button>
+                        </Link>
+                      </Box>
                     </BlockStack>
                   </Card>
                 ))}
@@ -200,19 +169,62 @@ export default function Index() {
           </Layout.Section>
         </Layout>
 
-
-        {/* Section prochaines étapes */}
+        {/* Accès rapide aux configurations */}
         <Layout>
           <Layout.Section>
             <Card>
               <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">Prochaines étapes</Text>
-                <List type="number">
-                  <List.Item>Configurez BoostCart pour vos offres progressives</List.Item>
-                  <List.Item>Créez vos premiers packs avec Bundle Creator</List.Item>
-                  <List.Item>Personnalisez l'affichage de vos variantes</List.Item>
-                  <List.Item>Optimisez vos taux de conversion</List.Item>
-                </List>
+                <Text as="h2" variant="headingMd">Accès rapide aux configurations</Text>
+                <Text variant="bodyMd" tone="subdued">
+                  Configurez rapidement vos extensions depuis ces raccourcis
+                </Text>
+                
+                <InlineStack gap="300" wrap>
+                  <Link to="/app/offers-settings" style={{ textDecoration: 'none' }}>
+                    <Button variant="secondary">⚡ BoostCart</Button>
+                  </Link>
+                  <Link to="/app/setup-packbuilder" style={{ textDecoration: 'none' }}>
+                    <Button variant="secondary">🎯 Pack Builder</Button>
+                  </Link>
+                  <Link to="/app/setup-bundlecard" style={{ textDecoration: 'none' }}>
+                    <Button variant="secondary">🃏 Bundle Cards</Button>
+                  </Link>
+                  <Link to="/app/setup-ultimatepack" style={{ textDecoration: 'none' }}>
+                    <Button variant="secondary">🚀 Ultimate Pack</Button>
+                  </Link>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+
+        {/* Vidéo guide d'installation */}
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">Découvrez votre guide d'installation</Text>
+                <div style={{
+                  position: 'relative',
+                  paddingBottom: '56.25%',
+                  height: 0,
+                  overflow: 'hidden',
+                  borderRadius: '8px'
+                }}>
+                  <iframe
+                    src="https://www.youtube.com/embed/q_MxGoIKWJ0"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      border: 'none'
+                    }}
+                    allowFullScreen
+                    title="Présentation Ecomkit"
+                  />
+                </div>
               </BlockStack>
             </Card>
           </Layout.Section>

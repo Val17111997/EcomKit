@@ -3,7 +3,7 @@
 client_id = "12cef638ec0c369730c3c21c3372f0c9"
 name = "ecom-kit"
 handle = "ecom-kit-2"
-application_url = "https://parliamentary-prep-blvd-dominant.trycloudflare.com"
+application_url = "https://continuing-musician-lebanon-swimming.trycloudflare.com"
 embedded = true
 
 [build]
@@ -19,9 +19,9 @@ scopes = ""
 
 [auth]
 redirect_urls = [
-  "https://parliamentary-prep-blvd-dominant.trycloudflare.com/auth/callback",
-  "https://parliamentary-prep-blvd-dominant.trycloudflare.com/auth/shopify/callback",
-  "https://parliamentary-prep-blvd-dominant.trycloudflare.com/api/auth/callback"
+  "https://continuing-musician-lebanon-swimming.trycloudflare.com/auth/callback",
+  "https://continuing-musician-lebanon-swimming.trycloudflare.com/auth/shopify/callback",
+  "https://continuing-musician-lebanon-swimming.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

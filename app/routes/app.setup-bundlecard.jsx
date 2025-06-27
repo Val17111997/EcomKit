@@ -377,7 +377,7 @@ function ActivationGuide() {
           
           <div style={{ marginTop: "24px" }}>
             <Button 
-              url="shopify:admin/themes/current/editor?context=apps"
+              url="shopify:admin/themes/current/editor"
               external
               variant="primary"
             >
@@ -616,15 +616,25 @@ export default function BundleSetup() {
       title="Paramètres des Cartes Bundle"
       subtitle="Configurez l'affichage de vos variantes produits sous forme de cartes"
     >
+      {/* Bannière */}
+      <Box paddingBlockEnd="6">
+        <Image
+          source="/images/Bundle-Cards.png"
+          alt="Bundle Cards"
+          width="100%"
+          style={{ borderRadius: "8px" }}
+        />
+      </Box>
+      
       {/* Message de statut */}
       {(showStatusMessage || error) && (
-        <div style={{ marginBottom: "16px" }}>
+        <Box paddingBlockEnd="4">
           <Banner
             status={isSuccess ? "success" : "critical"}
           >
             {error || statusMessage}
           </Banner>
-        </div>
+        </Box>
       )}
       
       <Layout>

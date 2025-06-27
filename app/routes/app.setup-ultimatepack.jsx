@@ -297,7 +297,7 @@ function ExtensionGuide() {
           
           <Box paddingBlockStart="4">
             <Button 
-              url="shopify:admin/themes/current/editor?context=apps"
+              url="shopify:admin/themes/current/editor"
               external
               variant="primary"
             >
@@ -410,15 +410,25 @@ export default function UltimatePackSetup() {
       title="Setup Ultimate Pack"
       subtitle="Configurez l'extension Ultimate Pack pour vos produits"
     >
+      {/* Bannière */}
+      <Box paddingBlockEnd="6">
+        <Image
+          source="/images/banniere-ultimate-pack.png"
+          alt="Ultimate Pack"
+          width="100%"
+          style={{ borderRadius: "8px" }}
+        />
+      </Box>
+      
       {/* Message de statut */}
       {(showStatusMessage || error) && (
-        <div style={{ marginBottom: "16px" }}>
+        <Box paddingBlockEnd="4">
           <Banner
             status={isSuccess ? "success" : "critical"}
           >
             {error || statusMessage}
           </Banner>
-        </div>
+        </Box>
       )}
       
       <Layout>
