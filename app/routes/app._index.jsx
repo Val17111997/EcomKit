@@ -17,7 +17,26 @@ import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  console.log("🚀 Page d'accueil chargée");
+  console.log("📍 URL complète:", request.url);
+  
+  // Récupérer les paramètres de l'URL
+  const url = new URL(request.url);
+  const chargeId = url.searchParams.get('charge_id');
+  const host = url.searchParams.get('host');
+  const shop = url.searchParams.get('shop');
+  
+  console.log("💳 Charge ID:", chargeId);
+  console.log("🏪 Shop:", shop);
+  console.log("🏠 Host:", host);
+  
+  try {
+    await authenticate.admin(request);
+    console.log("✅ Authentification réussie");
+  } catch (error) {
+    console.error("❌ Erreur d'authentification:", error);
+  }
+  
   return null;
 };
 
@@ -30,6 +49,13 @@ export const action = async ({ request }) => {
 export default function Index() {
   const fetcher = useFetcher();
   const shopify = useAppBridge();
+
+  // Log côté client aussi
+  useEffect(() => {
+    console.log("🌐 URL côté client:", window.location.href);
+    const urlParams = new URLSearchParams(window.location.search);
+    console.log("📋 Paramètres:", Object.fromEntries(urlParams));
+  }, []);
 
   const extensions = [
     {
@@ -96,6 +122,22 @@ export default function Index() {
       </TitleBar>
       
       <BlockStack gap="800">
+        {/* Message de succès après paiement */}
+        <Layout>
+          <Layout.Section>
+            <Card tone="success">
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingMd">
+                  🎉 Bienvenue dans Ecomkit !
+                </Text>
+                <Text variant="bodyMd">
+                  Votre abonnement a été activé avec succès. Vous pouvez maintenant configurer vos extensions.
+                </Text>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+
         {/* En-tête de bienvenue */}
         <Layout>
           <Layout.Section>
