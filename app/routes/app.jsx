@@ -11,45 +11,23 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
   try {
+    // Authentification et vérification d'abonnement
     const { admin, session } = await authenticate.admin(request);
     
-    const shopDomain = session.shop;
-    console.log("🏪 Shop domain:", shopDomain);
+    console.log("🏪 Shop:", session.shop);
     
-    // ✅ VÉRIFICATION D'ABONNEMENT VIA GRAPHQL
+    // ✅ VÉRIFIER L'ABONNEMENT AVEC MANAGED PRICING
     try {
-      console.log("🔍 Vérification des abonnements via GraphQL...");
-      
+      // Requête GraphQL pour vérifier les abonnements actifs
       const query = `
         query {
           currentAppInstallation {
             id
-            app {
-              id
-              title
-            }
             activeSubscriptions {
               id
               name
               status
-              createdAt
-              currentPeriodEnd
-              trialDays
               test
-              lineItems {
-                id
-                plan {
-                  pricingDetails {
-                    ... on AppRecurringPricing {
-                      price {
-                        amount
-                        currencyCode
-                      }
-                      interval
-                    }
-                  }
-                }
-              }
             }
           }
         }
@@ -58,129 +36,132 @@ export const loader = async ({ request }) => {
       const response = await admin.graphql(query);
       const data = await response.json();
       
-      console.log("📋 Réponse GraphQL:", JSON.stringify(data, null, 2));
-      
-      if (data.errors) {
-        console.error("❌ Erreurs GraphQL:", data.errors);
-        throw new Error(`GraphQL errors: ${data.errors.map(e => e.message).join(", ")}`);
-      }
-      
       const installation = data.data?.currentAppInstallation;
       const activeSubscriptions = installation?.activeSubscriptions || [];
       
-      console.log("📊 Abonnements actifs trouvés:", activeSubscriptions.length);
+      console.log("📊 Abonnements actifs:", activeSubscriptions.length);
       
-      if (activeSubscriptions.length > 0) {
-        const subscription = activeSubscriptions[0];
-        const isTrialActive = subscription.test || false;
-        const subscriptionStatus = subscription.status || 'ACTIVE';
-        
-        // Calculer les jours restants d'essai
-        let trialDaysRemaining = null;
-        if (subscription.trialDays && subscription.createdAt) {
-          const createdAt = new Date(subscription.createdAt);
-          const now = new Date();
-          const daysPassed = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
-          trialDaysRemaining = Math.max(0, subscription.trialDays - daysPassed);
-        }
-        
-        console.log("✅ Abonnement actif trouvé:", {
-          id: subscription.id,
-          name: subscription.name,
-          status: subscriptionStatus,
-          isTrialActive,
-          trialDaysRemaining
-        });
-        
-        return json({
-          apiKey: process.env.SHOPIFY_API_KEY || "",
-          subscription: {
-            hasAccess: true,
-            needsSubscription: false,
-            isTrialActive,
-            subscriptionStatus,
-            trialDaysRemaining,
-            details: subscription,
-            shopDomain,
-            method: "GraphQL"
-          }
-        });
-      } else {
-        console.log("❌ Aucun abonnement actif trouvé");
-        
-        return json({
-          apiKey: process.env.SHOPIFY_API_KEY || "",
-          subscription: {
-            hasAccess: false,
-            needsSubscription: true,
-            isTrialActive: false,
-            subscriptionStatus: 'NONE',
-            trialDaysRemaining: null,
-            details: null,
-            shopDomain,
-            method: "GraphQL"
-          }
-        });
-      }
-      
-    } catch (graphqlError) {
-      console.error("❌ Erreur GraphQL:", graphqlError);
-      
-      // En cas d'erreur GraphQL, permettre l'accès limité
+      // ✅ RETOURNER L'INFO AU CLIENT AU LIEU DE REDIRIGER CÔTÉ SERVEUR
       return json({
         apiKey: process.env.SHOPIFY_API_KEY || "",
-        subscription: {
-          hasAccess: false,
-          needsSubscription: true,
-          isTrialActive: false,
-          subscriptionStatus: 'ERROR',
-          trialDaysRemaining: null,
-          details: null,
-          error: graphqlError.message,
-          shopDomain,
-          method: "GraphQL"
-        }
+        shop: session.shop,
+        managedPricing: true,
+        hasActiveSubscription: activeSubscriptions.length > 0,
+        needsBilling: activeSubscriptions.length === 0,
+        // URL pour la redirection côté client
+        billingUrl: `https://${session.shop}/admin/charges/ecom-kit-2/pricing_plans`
+      });
+      
+    } catch (graphqlError) {
+      console.log("⚠️ Erreur lors de la vérification - Accès limité autorisé");
+      
+      return json({
+        apiKey: process.env.SHOPIFY_API_KEY || "",
+        shop: session.shop,
+        managedPricing: true,
+        hasActiveSubscription: false,
+        needsBilling: true,
+        billingUrl: `https://${session.shop}/admin/charges/ecom-kit-2/pricing_plans`
       });
     }
     
   } catch (error) {
-    console.error("❌ Error in app loader:", error);
-    
-    try {
-      const { session } = await authenticate.admin(request);
-      
-      return json({
-        apiKey: process.env.SHOPIFY_API_KEY || "",
-        subscription: {
-          hasAccess: false,
-          needsSubscription: true,
-          isTrialActive: false,
-          subscriptionStatus: 'ERROR',
-          trialDaysRemaining: null,
-          details: null,
-          error: error.message,
-          shopDomain: session.shop,
-          method: "GraphQL"
-        }
-      });
-    } catch (fallbackError) {
-      throw new Response("Authentication failed", { status: 500 });
-    }
+    console.error("❌ Erreur d'authentification:", error);
+    throw new Response("Authentication failed", { status: 500 });
   }
 };
 
 export default function App() {
-  const { apiKey, subscription } = useLoaderData();
+  const { apiKey, shop, managedPricing, hasActiveSubscription, needsBilling, billingUrl } = useLoaderData();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
+  // ✅ REDIRECTION AVEC APP BRIDGE (méthode officielle Shopify)
+  useEffect(() => {
+    if (isClient && needsBilling && billingUrl) {
+      console.log("🔄 Redirection via App Bridge vers:", billingUrl);
+      
+      try {
+        // Méthode 1: Via App Bridge
+        if (window.shopifyApp) {
+          window.shopifyApp.redirect({
+            url: billingUrl,
+            target: 'parent'
+          });
+        } 
+        // Méthode 2: Via postMessage à la fenêtre parent
+        else if (window.parent) {
+          window.parent.postMessage({
+            type: 'SHOPIFY_APP_REDIRECT',
+            url: billingUrl
+          }, '*');
+        }
+        // Méthode 3: Meta refresh (fallback)
+        else {
+          const meta = document.createElement('meta');
+          meta.httpEquiv = 'refresh';
+          meta.content = `0; url=${billingUrl}`;
+          document.head.appendChild(meta);
+        }
+      } catch (error) {
+        console.error("Erreur de redirection:", error);
+      }
+    }
+  }, [isClient, needsBilling, billingUrl]);
+
   if (!isClient) {
     return (
       <AppProvider isEmbeddedApp apiKey={apiKey}>
         <div>Chargement...</div>
+      </AppProvider>
+    );
+  }
+
+  // ✅ AFFICHER MESSAGE AVEC LIEN MANUEL
+  if (needsBilling) {
+    return (
+      <AppProvider isEmbeddedApp apiKey={apiKey}>
+        <div style={{ 
+          padding: "40px", 
+          textAlign: "center",
+          fontSize: "16px",
+          maxWidth: "600px",
+          margin: "0 auto"
+        }}>
+          <div style={{ fontSize: "18px", marginBottom: "20px" }}>
+            🎯 <strong>Abonnement requis</strong>
+          </div>
+          
+          <div style={{ marginBottom: "30px", color: "#666" }}>
+            Pour utiliser cette application, vous devez souscrire à un plan.
+          </div>
+          
+          <div style={{ marginBottom: "20px" }}>
+            <a 
+              href={billingUrl} 
+              target="_parent"
+              style={{
+                display: "inline-block",
+                padding: "12px 24px",
+                backgroundColor: "#5c6ac4",
+                color: "white",
+                textDecoration: "none",
+                borderRadius: "4px",
+                fontSize: "16px",
+                fontWeight: "bold"
+              }}
+            >
+              📋 Voir les plans disponibles
+            </a>
+          </div>
+          
+          <div style={{ fontSize: "14px", color: "#999" }}>
+            Vous serez redirigé vers la page de sélection de plan Shopify
+          </div>
+        </div>
       </AppProvider>
     );
   }
@@ -194,10 +175,10 @@ export default function App() {
         <Link to="/app/setup-ultimatepack">Set-up Ultimate Pack</Link>
         <Link to="/app/setup-packbuilder">Set-up Pack Builder</Link>
         <Link to="/app/support">Support client</Link>
-        <Link to="/app/plans">Plans & Facturation</Link>
       </NavMenu>
       
-      <Outlet context={{ subscription }} />
+      {/* Plus de gestion d'abonnement complexe - Shopify gère tout ! */}
+      <Outlet context={{ shop, managedPricing, hasActiveSubscription }} />
     </AppProvider>
   );
 }

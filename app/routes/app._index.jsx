@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useFetcher, Link, useOutletContext } from "@remix-run/react";
+import { useFetcher, Link } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -10,9 +10,7 @@ import {
   Box,
   List,
   InlineStack,
-  Icon,
   Divider,
-  Banner,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -31,7 +29,6 @@ export const action = async ({ request }) => {
 export default function Index() {
   const fetcher = useFetcher();
   const shopify = useAppBridge();
-  const { subscription } = useOutletContext();
 
   const extensions = [
     {
@@ -98,49 +95,6 @@ export default function Index() {
       </TitleBar>
       
       <BlockStack gap="800">
-        {/* Bannière d'abonnement si nécessaire */}
-        {subscription?.needsSubscription && (
-          <Layout>
-            <Layout.Section>
-              <Banner
-                title="Abonnement requis pour utiliser toutes les fonctionnalités"
-                action={{
-                  content: 'Voir les plans',
-                  url: '/app/plans',
-                }}
-                tone="warning"
-              >
-                <p>
-                  Vous pouvez explorer l'interface, mais un abonnement est requis pour utiliser les extensions.
-                </p>
-              </Banner>
-            </Layout.Section>
-          </Layout>
-        )}
-
-        {/* Statut d'abonnement pour debug */}
-        {subscription && (
-          <Layout>
-            <Layout.Section>
-              <Card>
-                <BlockStack gap="200">
-                  <Text variant="headingSm">État de l'abonnement (debug)</Text>
-                  <Text variant="bodyMd">
-                    Shop: {subscription.shopDomain} | 
-                    Status: {subscription.subscriptionStatus} | 
-                    Accès: {subscription.hasAccess ? '✅' : '❌'}
-                  </Text>
-                  {subscription.isTrialActive && (
-                    <Text variant="bodyMd" tone="success">
-                      🎉 Essai gratuit actif - {subscription.trialDaysRemaining} jours restants
-                    </Text>
-                  )}
-                </BlockStack>
-              </Card>
-            </Layout.Section>
-          </Layout>
-        )}
-        
         {/* En-tête de bienvenue */}
         <Layout>
           <Layout.Section>
@@ -202,11 +156,10 @@ export default function Index() {
                       <Box paddingBlockStart="300">
                         <Link to={extension.configUrl} style={{ textDecoration: 'none' }}>
                           <Button 
-                            variant={subscription?.hasAccess ? "primary" : "secondary"} 
+                            variant="primary" 
                             size="medium"
-                            disabled={!subscription?.hasAccess}
                           >
-                            {subscription?.hasAccess ? "Configurer" : "Abonnement requis"}
+                            Configurer
                           </Button>
                         </Link>
                       </Box>
@@ -230,19 +183,16 @@ export default function Index() {
                 
                 <InlineStack gap="300" wrap>
                   <Link to="/app/offers-settings" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary" disabled={!subscription?.hasAccess}>⚡ BoostCart</Button>
+                    <Button variant="secondary">⚡ BoostCart</Button>
                   </Link>
                   <Link to="/app/setup-packbuilder" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary" disabled={!subscription?.hasAccess}>🎯 Pack Builder</Button>
+                    <Button variant="secondary">🎯 Pack Builder</Button>
                   </Link>
                   <Link to="/app/setup-bundlecard" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary" disabled={!subscription?.hasAccess}>🃏 Bundle Cards</Button>
+                    <Button variant="secondary">🃏 Bundle Cards</Button>
                   </Link>
                   <Link to="/app/setup-ultimatepack" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary" disabled={!subscription?.hasAccess}>🚀 Ultimate Pack</Button>
-                  </Link>
-                  <Link to="/app/plans" style={{ textDecoration: 'none' }}>
-                    <Button variant="primary">💎 Plans & Facturation</Button>
+                    <Button variant="secondary">🚀 Ultimate Pack</Button>
                   </Link>
                 </InlineStack>
               </BlockStack>
