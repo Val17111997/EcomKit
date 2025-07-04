@@ -11,33 +11,86 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
   try {
-    // Authenticate with Shopify credentials
-    const { admin, billing, session } = await authenticate.admin(request);
+    const { admin, session } = await authenticate.admin(request);
     
     const shopDomain = session.shop;
     console.log("🏪 Shop domain:", shopDomain);
     
-    // ✅ Vérifier l'abonnement mais ne pas bloquer - laisser chaque route décider
-    console.log("🔍 Checking subscription for store:", shopDomain);
-    
+    // ✅ VÉRIFICATION D'ABONNEMENT VIA GRAPHQL
     try {
-      const { appSubscriptions } = await billing.check();
-      console.log("📋 Abonnements trouvés:", appSubscriptions?.length || 0);
+      console.log("🔍 Vérification des abonnements via GraphQL...");
       
-      if (appSubscriptions && appSubscriptions.length > 0) {
-        const subscription = appSubscriptions[0];
-        const isTrialActive = subscription?.test || false;
-        const subscriptionStatus = subscription?.status || 'ACTIVE';
+      const query = `
+        query {
+          currentAppInstallation {
+            id
+            app {
+              id
+              title
+            }
+            activeSubscriptions {
+              id
+              name
+              status
+              createdAt
+              currentPeriodEnd
+              trialDays
+              test
+              lineItems {
+                id
+                plan {
+                  pricingDetails {
+                    ... on AppRecurringPricing {
+                      price {
+                        amount
+                        currencyCode
+                      }
+                      interval
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+      
+      const response = await admin.graphql(query);
+      const data = await response.json();
+      
+      console.log("📋 Réponse GraphQL:", JSON.stringify(data, null, 2));
+      
+      if (data.errors) {
+        console.error("❌ Erreurs GraphQL:", data.errors);
+        throw new Error(`GraphQL errors: ${data.errors.map(e => e.message).join(", ")}`);
+      }
+      
+      const installation = data.data?.currentAppInstallation;
+      const activeSubscriptions = installation?.activeSubscriptions || [];
+      
+      console.log("📊 Abonnements actifs trouvés:", activeSubscriptions.length);
+      
+      if (activeSubscriptions.length > 0) {
+        const subscription = activeSubscriptions[0];
+        const isTrialActive = subscription.test || false;
+        const subscriptionStatus = subscription.status || 'ACTIVE';
         
+        // Calculer les jours restants d'essai
         let trialDaysRemaining = null;
-        if (isTrialActive && subscription?.trialDays) {
+        if (subscription.trialDays && subscription.createdAt) {
           const createdAt = new Date(subscription.createdAt);
           const now = new Date();
           const daysPassed = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
           trialDaysRemaining = Math.max(0, subscription.trialDays - daysPassed);
         }
         
-        console.log("✅ Abonnement actif trouvé:", subscriptionStatus);
+        console.log("✅ Abonnement actif trouvé:", {
+          id: subscription.id,
+          name: subscription.name,
+          status: subscriptionStatus,
+          isTrialActive,
+          trialDaysRemaining
+        });
         
         return json({
           apiKey: process.env.SHOPIFY_API_KEY || "",
@@ -48,11 +101,12 @@ export const loader = async ({ request }) => {
             subscriptionStatus,
             trialDaysRemaining,
             details: subscription,
-            shopDomain
+            shopDomain,
+            method: "GraphQL"
           }
         });
       } else {
-        console.log("❌ Aucun abonnement trouvé");
+        console.log("❌ Aucun abonnement actif trouvé");
         
         return json({
           apiKey: process.env.SHOPIFY_API_KEY || "",
@@ -63,15 +117,16 @@ export const loader = async ({ request }) => {
             subscriptionStatus: 'NONE',
             trialDaysRemaining: null,
             details: null,
-            shopDomain
+            shopDomain,
+            method: "GraphQL"
           }
         });
       }
       
-    } catch (billingError) {
-      console.error("❌ Billing error:", billingError);
+    } catch (graphqlError) {
+      console.error("❌ Erreur GraphQL:", graphqlError);
       
-      // En cas d'erreur, permettre l'accès pour tester
+      // En cas d'erreur GraphQL, permettre l'accès limité
       return json({
         apiKey: process.env.SHOPIFY_API_KEY || "",
         subscription: {
@@ -81,8 +136,9 @@ export const loader = async ({ request }) => {
           subscriptionStatus: 'ERROR',
           trialDaysRemaining: null,
           details: null,
-          error: billingError.message,
-          shopDomain
+          error: graphqlError.message,
+          shopDomain,
+          method: "GraphQL"
         }
       });
     }
@@ -103,7 +159,8 @@ export const loader = async ({ request }) => {
           trialDaysRemaining: null,
           details: null,
           error: error.message,
-          shopDomain: session.shop
+          shopDomain: session.shop,
+          method: "GraphQL"
         }
       });
     } catch (fallbackError) {
@@ -112,17 +169,14 @@ export const loader = async ({ request }) => {
   }
 };
 
-// ✅ Composant principal avec gestion d'hydration
 export default function App() {
   const { apiKey, subscription } = useLoaderData();
   const [isClient, setIsClient] = useState(false);
 
-  // ✅ useEffect pour éviter les différences serveur/client
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // ✅ Pendant l'hydration, afficher un état minimal identique serveur/client
   if (!isClient) {
     return (
       <AppProvider isEmbeddedApp apiKey={apiKey}>
@@ -131,7 +185,6 @@ export default function App() {
     );
   }
 
-  // ✅ Après hydration, afficher le contenu complet
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
       <NavMenu>
@@ -144,7 +197,6 @@ export default function App() {
         <Link to="/app/plans">Plans & Facturation</Link>
       </NavMenu>
       
-      {/* Toujours afficher le contenu principal - gérer l'abonnement dans les sous-routes */}
       <Outlet context={{ subscription }} />
     </AppProvider>
   );

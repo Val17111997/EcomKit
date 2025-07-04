@@ -3,7 +3,7 @@
 client_id = "12cef638ec0c369730c3c21c3372f0c9"
 name = "ecom-kit"
 handle = "ecom-kit-2"
-application_url = "https://camcorder-fire-jm-kilometers.trycloudflare.com"
+application_url = "https://boston-societies-error-hazard.trycloudflare.com"
 embedded = true
 
 [build]
@@ -29,9 +29,9 @@ scopes = "write_products,read_products,read_orders,read_customers,write_payment_
 
 [auth]
 redirect_urls = [
-  "https://camcorder-fire-jm-kilometers.trycloudflare.com/auth/callback",
-  "https://camcorder-fire-jm-kilometers.trycloudflare.com/auth/shopify/callback",
-  "https://camcorder-fire-jm-kilometers.trycloudflare.com/api/auth/callback"
+  "https://boston-societies-error-hazard.trycloudflare.com/auth/callback",
+  "https://boston-societies-error-hazard.trycloudflare.com/auth/shopify/callback",
+  "https://boston-societies-error-hazard.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
