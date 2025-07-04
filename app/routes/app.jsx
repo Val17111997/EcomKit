@@ -174,6 +174,7 @@ export default function App() {
         <Link to="/app/setup-bundlecard">Set-up Bundle-Card</Link>
         <Link to="/app/setup-ultimatepack">Set-up Ultimate Pack</Link>
         <Link to="/app/setup-packbuilder">Set-up Pack Builder</Link>
+        <Link to="/app/plans">Plans & Facturation</Link>g
         <Link to="/app/support">Support client</Link>
       </NavMenu>
       
