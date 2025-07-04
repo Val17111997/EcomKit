@@ -1,33 +1,48 @@
-// app/routes/app.plans.jsx
-import { json } from "@remix-run/node";
-import { Page, Layout, Card, Text, Button } from "@shopify/polaris";
+import { json, redirect } from "@remix-run/node";
+import { useActionData, Form, useNavigation } from "@remix-run/react";
+import { Page, Layout, Card, Text, Button, BlockStack } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { authenticate } from "../shopify.server";
+import { useEffect } from "react";
 
-export const loader = async () => {
+export const action = async ({ request }) => {
+  const { session, billing } = await authenticate.admin(request);
+  const formData = await request.formData();
+  
+  if (formData.get("action") === "subscribe") {
+    console.log("🚀 Création d'abonnement pour:", session.shop);
+    
+    try {
+      // Créer un vrai abonnement Shopify avec le bon shop dans l'URL
+      const billingCheck = await billing.request({
+        plan: "starter", // ✅ CORRIGÉ : utilise le nom exact du Partners Dashboard
+        isTest: true, // Mettez false en production
+        returnUrl: `${process.env.SHOPIFY_APP_URL}/app?shop=${session.shop}`, // ✅ CORRIGÉ : inclut le shop actuel
+      });
+      
+      console.log("✅ Abonnement créé:", billingCheck);
+      
+      // Rediriger vers l'URL de confirmation Shopify
+      return redirect(billingCheck.confirmationUrl);
+      
+    } catch (error) {
+      console.error("❌ Erreur création abonnement:", error);
+      
+      return json({ 
+        error: "Erreur lors de la création de l'abonnement",
+        details: error.message 
+      });
+    }
+  }
+  
   return json({ success: true });
 };
 
 export default function PlansPage() {
-  const handleRedirectToPricing = () => {
-    // URL exacte qui fonctionne manuellement
-    const pricingUrl = "https://admin.shopify.com/store/ecomkit-demo/charges/ecom-kit-2/pricing_plans";
-    
-    console.log("Redirection vers:", pricingUrl);
-    
-    try {
-      // Méthode simple et fiable: Redirection directe
-      if (window.top) {
-        window.top.location.href = pricingUrl;
-      } else {
-        window.location.href = pricingUrl;
-      }
-      console.log("Redirection lancée");
-    } catch (error) {
-      console.log("Erreur de redirection:", error);
-      // Fallback
-      window.open(pricingUrl, '_blank');
-    }
-  };
+  const actionData = useActionData();
+  const navigation = useNavigation();
+  
+  const isSubscribing = navigation.formData?.get("action") === "subscribe";
 
   return (
     <Page>
@@ -35,36 +50,59 @@ export default function PlansPage() {
       <Layout>
         <Layout.Section>
           <Card sectioned>
-            <Text variant="headingMd" as="h2">
-              💼 Plan Premium
-            </Text>
-            <Text variant="bodyMd" as="p">
-              Débloquez toutes les fonctionnalités d'Ecom-kit pour booster vos ventes.
-            </Text>
-            <Text variant="bodyMd" as="p">
-              <strong>19,90€/mois</strong> - ✨ Essai gratuit de 7 jours
-            </Text>
-            
-            <ul style={{ margin: "15px 0", paddingLeft: "20px" }}>
-              <li>🚀 Accès à toutes les fonctionnalités BoostCart</li>
-              <li>📊 Analytics avancées</li>
-              <li>🎯 Support prioritaire</li>
-              <li>💡 Mises à jour automatiques</li>
-            </ul>
-            
-            <div style={{ marginTop: "20px" }}>
-              <Button 
-                primary 
-                size="large"
-                onClick={handleRedirectToPricing}
-              >
-                🎯 Commencer l'essai gratuit
-              </Button>
-            </div>
-            
-            <Text variant="bodySm" as="p" color="subdued" alignment="center">
-              Vous serez redirigé vers la page de facturation Shopify
-            </Text>
+            <BlockStack gap="400">
+              <Text variant="headingMd" as="h2">
+                💼 Starter Plan - 19,90$/mois
+              </Text>
+              
+              <Text variant="bodyMd">
+                ✨ 14 jours d'essai gratuit puis 19,90$/mois
+              </Text>
+              
+              <BlockStack gap="200">
+                <Text variant="headingSm" as="h3">
+                  Fonctionnalités incluses :
+                </Text>
+                <ul style={{ paddingLeft: "20px" }}>
+                  <li>BoostCart - Panier intelligent avec offres progressives</li>
+                  <li>Pack Builder - Créateur de packs interactif</li>
+                  <li>Bundle Cards - Affichage élégant des variantes</li>
+                  <li>Ultimate Pack - Constructeur de packs avancé</li>
+                  <li>Support client prioritaire</li>
+                  <li>Mises à jour gratuites</li>
+                </ul>
+              </BlockStack>
+              
+              {actionData?.error && (
+                <Text variant="bodyMd" tone="critical">
+                  ❌ {actionData.error}
+                  {actionData.details && <div>Détails: {actionData.details}</div>}
+                </Text>
+              )}
+              
+              {actionData?.success && (
+                <Text variant="bodyMd" tone="success">
+                  ✅ Redirection vers la page de paiement...
+                </Text>
+              )}
+              
+              <Form method="post">
+                <input type="hidden" name="action" value="subscribe" />
+                <Button 
+                  variant="primary"
+                  size="large"
+                  loading={isSubscribing}
+                  submit
+                  fullWidth
+                >
+                  {isSubscribing ? "⏳ Création en cours..." : "🎯 Commencer l'essai gratuit"}
+                </Button>
+              </Form>
+              
+              <Text variant="bodySm" tone="subdued">
+                Vous serez redirigé vers la page de paiement Shopify officielle
+              </Text>
+            </BlockStack>
           </Card>
         </Layout.Section>
       </Layout>

@@ -14,9 +14,9 @@ automatically_update_urls_on_dev = true
 currency = "USD"
 
 [[billing.pricing_plans]]
-plan = "Starter"
-amount = 199.90
-currency_code = "USD"
+plan = "starter"           # ✅ CORRIGÉ : minuscules comme Partners Dashboard
+amount = 19.90            # ✅ CORRIGÉ : prix correct (était 199.90!)
+currency_code = "USD"    # ✅ OK - correspond à Partners Dashboard  
 interval = "EVERY_30_DAYS"
 trial_days = 14
 

@@ -39,9 +39,9 @@ export const loader = async ({ request }) => {
     // MAINTENANT TOUTES LES BOUTIQUES (Y COMPRIS VOTRE DEV) PASSENT PAR LA VÉRIFICATION
     console.log("🔍 Checking subscription for store:", shopDomain);
     
-    // ✅ UTILISER billing.require AU LIEU DE REDIRECTION MANUELLE
+    // ✅ UTILISER LE BON NOM DE PLAN QUI CORRESPOND À PARTNERS DASHBOARD
     await billing.require({
-      plans: ["Ecomkit Pro Plan"], // ✅ Doit correspondre exactement au nom dans shopify.app.toml
+      plans: ["starter"], // ✅ CORRIGÉ : utilise le nom exact du Partners Dashboard
       onFailure: async () => {
         throw new Response("Could not verify a subscription", { status: 401 });
       },
