@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useFetcher, Link } from "@remix-run/react";
+import { useFetcher, Link, useOutletContext } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -12,31 +12,13 @@ import {
   InlineStack,
   Icon,
   Divider,
+  Banner,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
-  console.log("🚀 Page d'accueil chargée");
-  console.log("📍 URL complète:", request.url);
-  
-  // Récupérer les paramètres de l'URL
-  const url = new URL(request.url);
-  const chargeId = url.searchParams.get('charge_id');
-  const host = url.searchParams.get('host');
-  const shop = url.searchParams.get('shop');
-  
-  console.log("💳 Charge ID:", chargeId);
-  console.log("🏪 Shop:", shop);
-  console.log("🏠 Host:", host);
-  
-  try {
-    await authenticate.admin(request);
-    console.log("✅ Authentification réussie");
-  } catch (error) {
-    console.error("❌ Erreur d'authentification:", error);
-  }
-  
+  await authenticate.admin(request);
   return null;
 };
 
@@ -49,13 +31,7 @@ export const action = async ({ request }) => {
 export default function Index() {
   const fetcher = useFetcher();
   const shopify = useAppBridge();
-
-  // Log côté client aussi
-  useEffect(() => {
-    console.log("🌐 URL côté client:", window.location.href);
-    const urlParams = new URLSearchParams(window.location.search);
-    console.log("📋 Paramètres:", Object.fromEntries(urlParams));
-  }, []);
+  const { subscription } = useOutletContext();
 
   const extensions = [
     {
@@ -122,22 +98,49 @@ export default function Index() {
       </TitleBar>
       
       <BlockStack gap="800">
-        {/* Message de succès après paiement */}
-        <Layout>
-          <Layout.Section>
-            <Card tone="success">
-              <BlockStack gap="200">
-                <Text as="h2" variant="headingMd">
-                  🎉 Bienvenue dans Ecomkit !
-                </Text>
-                <Text variant="bodyMd">
-                  Votre abonnement a été activé avec succès. Vous pouvez maintenant configurer vos extensions.
-                </Text>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        </Layout>
+        {/* Bannière d'abonnement si nécessaire */}
+        {subscription?.needsSubscription && (
+          <Layout>
+            <Layout.Section>
+              <Banner
+                title="Abonnement requis pour utiliser toutes les fonctionnalités"
+                action={{
+                  content: 'Voir les plans',
+                  url: '/app/plans',
+                }}
+                tone="warning"
+              >
+                <p>
+                  Vous pouvez explorer l'interface, mais un abonnement est requis pour utiliser les extensions.
+                </p>
+              </Banner>
+            </Layout.Section>
+          </Layout>
+        )}
 
+        {/* Statut d'abonnement pour debug */}
+        {subscription && (
+          <Layout>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="200">
+                  <Text variant="headingSm">État de l'abonnement (debug)</Text>
+                  <Text variant="bodyMd">
+                    Shop: {subscription.shopDomain} | 
+                    Status: {subscription.subscriptionStatus} | 
+                    Accès: {subscription.hasAccess ? '✅' : '❌'}
+                  </Text>
+                  {subscription.isTrialActive && (
+                    <Text variant="bodyMd" tone="success">
+                      🎉 Essai gratuit actif - {subscription.trialDaysRemaining} jours restants
+                    </Text>
+                  )}
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </Layout>
+        )}
+        
         {/* En-tête de bienvenue */}
         <Layout>
           <Layout.Section>
@@ -198,8 +201,12 @@ export default function Index() {
                       {/* Bouton de configuration */}
                       <Box paddingBlockStart="300">
                         <Link to={extension.configUrl} style={{ textDecoration: 'none' }}>
-                          <Button variant="primary" size="medium">
-                            Configurer
+                          <Button 
+                            variant={subscription?.hasAccess ? "primary" : "secondary"} 
+                            size="medium"
+                            disabled={!subscription?.hasAccess}
+                          >
+                            {subscription?.hasAccess ? "Configurer" : "Abonnement requis"}
                           </Button>
                         </Link>
                       </Box>
@@ -223,16 +230,19 @@ export default function Index() {
                 
                 <InlineStack gap="300" wrap>
                   <Link to="/app/offers-settings" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary">⚡ BoostCart</Button>
+                    <Button variant="secondary" disabled={!subscription?.hasAccess}>⚡ BoostCart</Button>
                   </Link>
                   <Link to="/app/setup-packbuilder" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary">🎯 Pack Builder</Button>
+                    <Button variant="secondary" disabled={!subscription?.hasAccess}>🎯 Pack Builder</Button>
                   </Link>
                   <Link to="/app/setup-bundlecard" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary">🃏 Bundle Cards</Button>
+                    <Button variant="secondary" disabled={!subscription?.hasAccess}>🃏 Bundle Cards</Button>
                   </Link>
                   <Link to="/app/setup-ultimatepack" style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary">🚀 Ultimate Pack</Button>
+                    <Button variant="secondary" disabled={!subscription?.hasAccess}>🚀 Ultimate Pack</Button>
+                  </Link>
+                  <Link to="/app/plans" style={{ textDecoration: 'none' }}>
+                    <Button variant="primary">💎 Plans & Facturation</Button>
                   </Link>
                 </InlineStack>
               </BlockStack>

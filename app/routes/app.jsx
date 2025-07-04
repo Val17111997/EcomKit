@@ -5,6 +5,7 @@ import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { authenticate } from "../shopify.server";
+import { useEffect, useState } from "react";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -13,76 +14,82 @@ export const loader = async ({ request }) => {
     // Authenticate with Shopify credentials
     const { admin, billing, session } = await authenticate.admin(request);
     
-    // Détecter votre boutique de développement
     const shopDomain = session.shop;
-    console.log("Shop domain:", shopDomain);
+    console.log("🏪 Shop domain:", shopDomain);
     
-    const isDevelopmentStore = shopDomain === 'ecomkit-demo.myshopify.com';
-    console.log("Is your development store:", isDevelopmentStore);
-    
-    // 🚫 BYPASS TEMPORAIREMENT DÉSACTIVÉ POUR DEBUG
-    // if (isDevelopmentStore) {
-    //   console.log("✅ Development store detected - free access granted");
-    //   return json({
-    //     apiKey: process.env.SHOPIFY_API_KEY || "",
-    //     subscription: {
-    //       hasAccess: true,
-    //       isTrialActive: false,
-    //       isDevelopmentStore: true,
-    //       subscriptionStatus: 'DEVELOPMENT',
-    //       trialDaysRemaining: null,
-    //       details: null
-    //     }
-    //   });
-    // }
-    
-    // MAINTENANT TOUTES LES BOUTIQUES (Y COMPRIS VOTRE DEV) PASSENT PAR LA VÉRIFICATION
+    // ✅ Vérifier l'abonnement mais ne pas bloquer - laisser chaque route décider
     console.log("🔍 Checking subscription for store:", shopDomain);
     
-    // ✅ UTILISER LE BON NOM DE PLAN QUI CORRESPOND À PARTNERS DASHBOARD
-    await billing.require({
-      plans: ["starter"], // ✅ CORRIGÉ : utilise le nom exact du Partners Dashboard
-      onFailure: async () => {
-        throw new Response("Could not verify a subscription", { status: 401 });
-      },
-    });
-    
-    // Si on arrive ici, l'abonnement est actif
-    const { appSubscriptions } = await billing.check();
-    const subscription = appSubscriptions[0];
-    const isTrialActive = subscription?.test || false;
-    const subscriptionStatus = subscription?.status || 'ACTIVE';
-    
-    // Calculer les jours restants d'essai si applicable
-    let trialDaysRemaining = null;
-    if (isTrialActive && subscription?.trialDays) {
-      const createdAt = new Date(subscription.createdAt);
-      const now = new Date();
-      const daysPassed = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
-      trialDaysRemaining = Math.max(0, subscription.trialDays - daysPassed);
-    }
-    
-    return json({
-      apiKey: process.env.SHOPIFY_API_KEY || "",
-      subscription: {
-        hasAccess: true,
-        isTrialActive,
-        isDevelopmentStore, // 🆕 Gardons cette info pour référence
-        subscriptionStatus,
-        trialDaysRemaining,
-        details: subscription
+    try {
+      const { appSubscriptions } = await billing.check();
+      console.log("📋 Abonnements trouvés:", appSubscriptions?.length || 0);
+      
+      if (appSubscriptions && appSubscriptions.length > 0) {
+        const subscription = appSubscriptions[0];
+        const isTrialActive = subscription?.test || false;
+        const subscriptionStatus = subscription?.status || 'ACTIVE';
+        
+        let trialDaysRemaining = null;
+        if (isTrialActive && subscription?.trialDays) {
+          const createdAt = new Date(subscription.createdAt);
+          const now = new Date();
+          const daysPassed = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+          trialDaysRemaining = Math.max(0, subscription.trialDays - daysPassed);
+        }
+        
+        console.log("✅ Abonnement actif trouvé:", subscriptionStatus);
+        
+        return json({
+          apiKey: process.env.SHOPIFY_API_KEY || "",
+          subscription: {
+            hasAccess: true,
+            needsSubscription: false,
+            isTrialActive,
+            subscriptionStatus,
+            trialDaysRemaining,
+            details: subscription,
+            shopDomain
+          }
+        });
+      } else {
+        console.log("❌ Aucun abonnement trouvé");
+        
+        return json({
+          apiKey: process.env.SHOPIFY_API_KEY || "",
+          subscription: {
+            hasAccess: false,
+            needsSubscription: true,
+            isTrialActive: false,
+            subscriptionStatus: 'NONE',
+            trialDaysRemaining: null,
+            details: null,
+            shopDomain
+          }
+        });
       }
-    });
+      
+    } catch (billingError) {
+      console.error("❌ Billing error:", billingError);
+      
+      // En cas d'erreur, permettre l'accès pour tester
+      return json({
+        apiKey: process.env.SHOPIFY_API_KEY || "",
+        subscription: {
+          hasAccess: false,
+          needsSubscription: true,
+          isTrialActive: false,
+          subscriptionStatus: 'ERROR',
+          trialDaysRemaining: null,
+          details: null,
+          error: billingError.message,
+          shopDomain
+        }
+      });
+    }
     
   } catch (error) {
-    console.error("Error in app loader:", error);
+    console.error("❌ Error in app loader:", error);
     
-    // Si c'est une erreur 401 (pas d'abonnement), Shopify redirigera automatiquement
-    if (error instanceof Response && error.status === 401) {
-      throw error;
-    }
-    
-    // Pour toute autre erreur, essayer de continuer
     try {
       const { session } = await authenticate.admin(request);
       
@@ -90,23 +97,41 @@ export const loader = async ({ request }) => {
         apiKey: process.env.SHOPIFY_API_KEY || "",
         subscription: {
           hasAccess: false,
+          needsSubscription: true,
           isTrialActive: false,
           subscriptionStatus: 'ERROR',
           trialDaysRemaining: null,
           details: null,
-          error: error.message
+          error: error.message,
+          shopDomain: session.shop
         }
       });
     } catch (fallbackError) {
-      // En dernier recours
       throw new Response("Authentication failed", { status: 500 });
     }
   }
 };
 
+// ✅ Composant principal avec gestion d'hydration
 export default function App() {
   const { apiKey, subscription } = useLoaderData();
+  const [isClient, setIsClient] = useState(false);
 
+  // ✅ useEffect pour éviter les différences serveur/client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // ✅ Pendant l'hydration, afficher un état minimal identique serveur/client
+  if (!isClient) {
+    return (
+      <AppProvider isEmbeddedApp apiKey={apiKey}>
+        <div>Chargement...</div>
+      </AppProvider>
+    );
+  }
+
+  // ✅ Après hydration, afficher le contenu complet
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
       <NavMenu>
@@ -119,7 +144,7 @@ export default function App() {
         <Link to="/app/plans">Plans & Facturation</Link>
       </NavMenu>
       
-      {/* Passer les données d'abonnement aux sous-routes */}
+      {/* Toujours afficher le contenu principal - gérer l'abonnement dans les sous-routes */}
       <Outlet context={{ subscription }} />
     </AppProvider>
   );

@@ -3,7 +3,7 @@
 client_id = "12cef638ec0c369730c3c21c3372f0c9"
 name = "ecom-kit"
 handle = "ecom-kit-2"
-application_url = "https://ecomkit.fly.dev"
+application_url = "https://camcorder-fire-jm-kilometers.trycloudflare.com"
 embedded = true
 
 [build]
@@ -13,12 +13,12 @@ automatically_update_urls_on_dev = true
 [billing]
 currency = "USD"
 
-[[billing.pricing_plans]]
-plan = "starter"           # ✅ CORRIGÉ : minuscules comme Partners Dashboard
-amount = 19.90            # ✅ CORRIGÉ : prix correct (était 199.90!)
-currency_code = "USD"    # ✅ OK - correspond à Partners Dashboard  
-interval = "EVERY_30_DAYS"
-trial_days = 14
+  [[billing.pricing_plans]]
+  plan = "starter"
+  amount = 19.9
+  currency_code = "USD"
+  interval = "EVERY_30_DAYS"
+  trial_days = 14
 
 [webhooks]
 api_version = "2025-04"
@@ -29,9 +29,9 @@ scopes = "write_products,read_products,read_orders,read_customers,write_payment_
 
 [auth]
 redirect_urls = [
-  "https://ecomkit.fly.dev/auth/callback",
-  "https://ecomkit.fly.dev/shopify/callback",
-  "https://ecomkit.fly.dev/api/auth/callback"
+  "https://camcorder-fire-jm-kilometers.trycloudflare.com/auth/callback",
+  "https://camcorder-fire-jm-kilometers.trycloudflare.com/auth/shopify/callback",
+  "https://camcorder-fire-jm-kilometers.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
