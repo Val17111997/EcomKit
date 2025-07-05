@@ -3,22 +3,12 @@
 client_id = "12cef638ec0c369730c3c21c3372f0c9"
 name = "ecom-kit"
 handle = "ecom-kit-2"
-application_url = "https://ecomkit.fly.dev"
+application_url = "https://volume-labs-bee-ron.trycloudflare.com"
 embedded = true
 
 [build]
 include_config_on_deploy = true
 automatically_update_urls_on_dev = true
-
-[billing]
-currency = "USD"
-
-  [[billing.pricing_plans]]
-  plan = "starter"
-  amount = 19.9
-  currency_code = "USD"
-  interval = "EVERY_30_DAYS"
-  trial_days = 14
 
 [webhooks]
 api_version = "2025-04"
@@ -29,9 +19,9 @@ scopes = "write_products,read_products,read_orders,read_customers,write_payment_
 
 [auth]
 redirect_urls = [
-  https://ecomkit.fly.dev/auth/callback",
-  "https://ecomkit.fly.dev /auth/shopify/callback",
-  "https://ecomkit.fly.dev/api/auth/callback"
+  "https://volume-labs-bee-ron.trycloudflare.com/auth/callback",
+  "https://volume-labs-bee-ron.trycloudflare.com/auth/shopify/callback",
+  "https://volume-labs-bee-ron.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]
