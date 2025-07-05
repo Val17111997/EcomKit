@@ -1,4 +1,4 @@
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
@@ -19,7 +19,7 @@ export const loader = async ({ request }) => {
     const shopName = session.shop.replace('.myshopify.com', '');
     const appHandle = "ecom-kit-2";
     
-    // Avec Managed Pricing, vous pouvez vérifier le statut via GraphQL
+    // Vérifiez le statut d'abonnement via GraphQL
     const subscriptionQuery = `
       query appInstallation {
         currentAppInstallation {
@@ -33,49 +33,35 @@ export const loader = async ({ request }) => {
       }
     `;
     
+    let hasActiveSubscription = false;
+    let subscriptions = [];
+    
     try {
       const subscriptionResponse = await admin.graphql(subscriptionQuery);
       const subscriptionData = await subscriptionResponse.json();
       
-      const activeSubscriptions = subscriptionData.data?.currentAppInstallation?.activeSubscriptions || [];
-      const hasActiveSubscription = activeSubscriptions.length > 0;
+      subscriptions = subscriptionData.data?.currentAppInstallation?.activeSubscriptions || [];
+      hasActiveSubscription = subscriptions.length > 0;
       
-      console.log("📋 Active subscriptions:", activeSubscriptions);
+      console.log("📋 Active subscriptions:", subscriptions);
       console.log("✅ Has subscription:", hasActiveSubscription);
-      
-      // Si pas d'abonnement et qu'on n'est pas déjà sur la page de plans
-      const url = new URL(request.url);
-      const isOnPlansPage = url.pathname.includes('/plans');
-      
-      if (!hasActiveSubscription && !isOnPlansPage) {
-        console.log("🔄 Redirection vers pricing plans");
-        // Redirection vers la page Shopify de sélection des plans
-        const pricingUrl = `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`;
-        return redirect(pricingUrl);
-      }
-      
-      return json({
-        apiKey: process.env.SHOPIFY_API_KEY || "",
-        shop: session.shop,
-        managedPricing: true,
-        hasSubscription: hasActiveSubscription,
-        subscriptions: activeSubscriptions,
-        pricingUrl: `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`
-      });
       
     } catch (subscriptionError) {
       console.warn("⚠️ Erreur vérification abonnement:", subscriptionError);
-      
-      // En cas d'erreur, on laisse passer (pour éviter de bloquer l'app)
-      return json({
-        apiKey: process.env.SHOPIFY_API_KEY || "",
-        shop: session.shop,
-        managedPricing: true,
-        hasSubscription: true, // On assume qu'il y a un abonnement en cas d'erreur
-        subscriptions: [],
-        pricingUrl: `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`
-      });
+      // En cas d'erreur, on assume pas d'abonnement pour forcer la vérification
+      hasActiveSubscription = false;
     }
+    
+    return json({
+      apiKey: process.env.SHOPIFY_API_KEY || "",
+      shop: session.shop,
+      managedPricing: true,
+      hasSubscription: hasActiveSubscription,
+      subscriptions: subscriptions,
+      shopName: shopName,
+      appHandle: appHandle,
+      pricingUrl: `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`
+    });
     
   } catch (error) {
     console.error("❌ Erreur d'authentification:", error);
@@ -84,17 +70,84 @@ export const loader = async ({ request }) => {
 };
 
 export default function App() {
-  const { apiKey, shop, managedPricing, hasSubscription, subscriptions, pricingUrl } = useLoaderData();
+  const { 
+    apiKey, 
+    shop, 
+    managedPricing, 
+    hasSubscription, 
+    subscriptions, 
+    shopName, 
+    appHandle,
+    pricingUrl 
+  } = useLoaderData();
+  
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    
+    // Redirection automatique vers pricing si pas d'abonnement
+    if (isClient && !hasSubscription) {
+      console.log("🔄 Pas d'abonnement détecté - Redirection vers pricing plans");
+      
+      // Option 1: App Bridge Navigation (Recommandée)
+      if (window.shopify && window.shopify.app) {
+        window.shopify.app.getState().then((state) => {
+          const url = `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`;
+          window.open(url, '_top');
+        });
+      } else {
+        // Option 2: Fallback direct
+        const url = `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`;
+        window.open(url, '_top');
+      }
+    }
+  }, [isClient, hasSubscription, shopName, appHandle]);
 
   if (!isClient) {
     return (
       <AppProvider isEmbeddedApp apiKey={apiKey}>
         <div>Chargement...</div>
+      </AppProvider>
+    );
+  }
+
+  // Si pas d'abonnement, afficher un message de redirection
+  if (!hasSubscription) {
+    return (
+      <AppProvider isEmbeddedApp apiKey={apiKey}>
+        <div style={{ 
+          padding: '40px', 
+          textAlign: 'center',
+          backgroundColor: '#f6f6f7',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <h2>🚀 Bienvenue dans ecom-kit !</h2>
+          <p>Redirection vers la sélection de votre plan...</p>
+          <br/>
+          <p>
+            <strong>Si la redirection ne fonctionne pas :</strong>
+            <br/>
+            <a 
+              href={pricingUrl}
+              target="_top"
+              style={{
+                color: '#2563eb',
+                textDecoration: 'underline'
+              }}
+            >
+              Cliquez ici pour choisir votre plan
+            </a>
+          </p>
+          <br/>
+          <small style={{ color: '#6b7280' }}>
+            URL: {pricingUrl}
+          </small>
+        </div>
       </AppProvider>
     );
   }
@@ -110,13 +163,15 @@ export default function App() {
         <Link to="/app/support">Support client</Link>
         <Link to="/app/plans">Plans & Facturation</Link>
         
-        {/* Debug info - à retirer en production */}
-        {!hasSubscription && (
-          <Link to={pricingUrl} target="_blank">⚠️ Upgrade Plan</Link>
-        )}
+        {/* Debug info */}
+        <Link to="#" onClick={(e) => {
+          e.preventDefault();
+          console.log("🔍 Debug abonnement:", { hasSubscription, subscriptions });
+        }}>
+          Debug: {hasSubscription ? '✅ Abonné' : '❌ Pas abonné'}
+        </Link>
       </NavMenu>
       
-      {/* Shopify Managed Pricing gère automatiquement la facturation */}
       <Outlet context={{ 
         shop, 
         managedPricing, 
