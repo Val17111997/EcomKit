@@ -12,9 +12,7 @@ export const loader = async ({ request }) => {
   // Replace with the "app_handle" from your shopify.app.toml file
   const appHandle = "ecom-kit-2";
   // Authenticate with Shopify credentials to handle server-side queries
-  const { authenticate } = await import("../shopify.server");
-  // Initiate billing and redirect utilities
-  const { billing, redirect, session } = await authenticate.admin(request);
+  const { billing, session } = await authenticate.admin(request);
   // Check whether the store has an active subscription
   const { hasActivePayment } = await billing.check();
   // Extract the store handle from the shop domain
