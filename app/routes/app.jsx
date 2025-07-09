@@ -98,7 +98,7 @@ export default function App() {
         });
       } else {
         // Option 2: Fallback direct
-        const url = `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
+        const url = `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`;
         window.open(url, '_top');
       }
     }
