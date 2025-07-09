@@ -1,48 +1,66 @@
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { authenticate } from "../shopify.server";
+import { useEffect, useState } from "react";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
   try {
-    // Remplacez par le "app_handle" de votre fichier shopify.app.toml
-    const appHandle = "ecom-kit-2";
-    
-    // Authentification avec les credentials Shopify
-    const { billing, session } = await authenticate.admin(request);
+    const { admin, session } = await authenticate.admin(request);
     
     console.log("🏪 Shop:", session.shop);
     
-    // Vérification de l'abonnement actif avec l'API billing de Shopify
-    const { hasActivePayment } = await billing.check();
+    // Vérification du statut d'abonnement avec Managed Pricing
+    const shopName = session.shop.replace('.myshopify.com', '');
+    const appHandle = "ecom-kit-2";
     
-    console.log("✅ Has active payment:", hasActivePayment);
+    // Vérifiez le statut d'abonnement via GraphQL
+    const subscriptionQuery = `
+      query appInstallation {
+        currentAppInstallation {
+          activeSubscriptions {
+            id
+            name
+            status
+            test
+          }
+        }
+      }
+    `;
     
-    // Extraction du store handle depuis le domaine de la boutique
-    const shop = session.shop; // ex: "cool-shop.myshopify.com"
-    const storeHandle = shop.replace('.myshopify.com', '');
+    let hasActiveSubscription = false;
+    let subscriptions = [];
     
-    // Si pas d'abonnement actif, redirection vers la page de sélection de plans
-    if (!hasActivePayment) {
-      console.log("🔄 Pas d'abonnement actif - Redirection vers pricing plans");
+    try {
+      const subscriptionResponse = await admin.graphql(subscriptionQuery);
+      const subscriptionData = await subscriptionResponse.json();
       
-      // Redirection côté serveur (recommandée par Shopify)
-      return redirect(`https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`, {
-        target: "_top" // requis car l'URL est en dehors du scope de l'app embarquée
-      });
+      subscriptions = subscriptionData.data?.currentAppInstallation?.activeSubscriptions || [];
+      hasActiveSubscription = subscriptions.length > 0;
+      
+      console.log("📋 Active subscriptions:", subscriptions);
+      console.log("✅ Has subscription:", hasActiveSubscription);
+      
+    } catch (subscriptionError) {
+      console.warn("⚠️ Erreur vérification abonnement:", subscriptionError);
+      // En cas d'erreur, on assume pas d'abonnement pour forcer la vérification
+      hasActiveSubscription = false;
     }
     
-    // Sinon, continuer le chargement normal de l'app
     return json({
-      apiKey: "12cef638ec0c369730c3c21c3372f0c9",
+      apiKey: process.env.SHOPIFY_API_KEY || "",
       shop: session.shop,
-      storeHandle: storeHandle,
-      appHandle: appHandle
+      managedPricing: true,
+      hasSubscription: hasActiveSubscription,
+      subscriptions: subscriptions,
+      shopName: shopName,
+      appHandle: appHandle,
+      pricingUrl: `https://admin.shopify.com/store/${shopName}/charges/${appHandle}/pricing_plans`
     });
     
   } catch (error) {
@@ -52,7 +70,87 @@ export const loader = async ({ request }) => {
 };
 
 export default function App() {
-  const { apiKey, shop, storeHandle, appHandle } = useLoaderData();
+  const { 
+    apiKey, 
+    shop, 
+    managedPricing, 
+    hasSubscription, 
+    subscriptions, 
+    shopName, 
+    appHandle,
+    pricingUrl 
+  } = useLoaderData();
+  
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    
+    // Redirection automatique vers pricing si pas d'abonnement
+    if (isClient && !hasSubscription) {
+      console.log("🔄 Pas d'abonnement détecté - Redirection vers pricing plans");
+      
+      // Option 1: App Bridge Navigation (Recommandée)
+      if (window.shopify && window.shopify.app) {
+        window.shopify.app.getState().then((state) => {
+          const url = `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
+          window.open(url, '_top');
+        });
+      } else {
+        // Option 2: Fallback direct
+        const url = `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
+        window.open(url, '_top');
+      }
+    }
+  }, [isClient, hasSubscription, shopName, appHandle]);
+
+  if (!isClient) {
+    return (
+      <AppProvider isEmbeddedApp apiKey={apiKey}>
+        <div>Chargement...</div>
+      </AppProvider>
+    );
+  }
+
+  // Si pas d'abonnement, afficher un message de redirection
+  if (!hasSubscription) {
+    return (
+      <AppProvider isEmbeddedApp apiKey={apiKey}>
+        <div style={{ 
+          padding: '40px', 
+          textAlign: 'center',
+          backgroundColor: '#f6f6f7',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <h2>🚀 Bienvenue dans ecom-kit !</h2>
+          <p>Redirection vers la sélection de votre plan...</p>
+          <br/>
+          <p>
+            <strong>Si la redirection ne fonctionne pas :</strong>
+            <br/>
+            <a 
+              href={pricingUrl}
+              target="_top"
+              style={{
+                color: '#2563eb',
+                textDecoration: 'underline'
+              }}
+            >
+              Cliquez ici pour choisir votre plan
+            </a>
+          </p>
+          <br/>
+          <small style={{ color: '#6b7280' }}>
+            URL: {pricingUrl}
+          </small>
+        </div>
+      </AppProvider>
+    );
+  }
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
@@ -64,12 +162,22 @@ export default function App() {
         <Link to="/app/setup-packbuilder">Set-up Pack Builder</Link>
         <Link to="/app/support">Support client</Link>
         <Link to="/app/plans">Plans & Facturation</Link>
+        
+        {/* Debug info */}
+        <Link to="#" onClick={(e) => {
+          e.preventDefault();
+          console.log("🔍 Debug abonnement:", { hasSubscription, subscriptions });
+        }}>
+          Debug: {hasSubscription ? '✅ Abonné' : '❌ Pas abonné'}
+        </Link>
       </NavMenu>
       
       <Outlet context={{ 
         shop, 
-        storeHandle, 
-        appHandle 
+        managedPricing, 
+        hasSubscription, 
+        subscriptions,
+        pricingUrl 
       }} />
     </AppProvider>
   );
