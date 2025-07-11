@@ -29,20 +29,41 @@ export const loader = async ({ request }) => {
     const { billing } = await authenticate.admin(request);
     console.log("Authentification réussie");
     
+    // Vérifier si c'est un retour de succès depuis Shopify
+    const url = new URL(request.url);
+    const success = url.searchParams.get('success');
+    const chargeId = url.searchParams.get('charge_id');
+    
+    // Si c'est un retour de succès, afficher une page de confirmation
+    if (success === '1' && chargeId) {
+      console.log("Retour de succès détecté, charge_id:", chargeId);
+      return json({
+        subscription: null,
+        hasActivePayment: false,
+        successReturn: true,
+        chargeId: chargeId,
+        showSuccessPage: true
+      });
+    }
+    
     // Test simple avec billing.check()
     const { hasActivePayment, appSubscriptions } = await billing.check();
     console.log("Billing check résultat:", { hasActivePayment, appSubscriptions });
     
     return json({
       subscription: appSubscriptions?.[0] || null,
-      hasActivePayment
+      hasActivePayment,
+      successReturn: false,
+      showSuccessPage: false
     });
   } catch (error) {
     console.error("Erreur loader billing:", error);
     return json({
       subscription: null,
       hasActivePayment: false,
-      error: error.message
+      error: error.message,
+      successReturn: false,
+      showSuccessPage: false
     });
   }
 };
@@ -70,10 +91,26 @@ export const action = async ({ request }) => {
       });
       
       try {
+        // URL de retour - utiliser l'URL locale en développement
+        const url = new URL(request.url);
+        const isDev = url.hostname.includes('trycloudflare.com') || url.hostname === 'localhost';
+        
+        let returnUrl;
+        if (isDev) {
+          // En développement, utiliser l'URL du tunnel CloudFlare
+          returnUrl = `${url.protocol}//${url.host}/app/billing/return`;
+        } else {
+          // En production, utiliser l'URL de production
+          returnUrl = `https://ecomkit.fly.dev/app/billing/return`;
+        }
+        
+        console.log("URL de retour calculée:", returnUrl);
+        console.log("Environnement détecté:", isDev ? "Développement" : "Production");
+        
         const response = await billing.request({
           plan: plan,
           isTest: true,
-          returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing?success=1`,
+          returnUrl: returnUrl,
         });
         
         console.log("Réponse billing.request:", response);
@@ -83,21 +120,28 @@ export const action = async ({ request }) => {
       } catch (billingError) {
         console.log("Erreur billing attrapée:", billingError);
         
-        // Vérifier si c'est une erreur 401 avec URL de réauthorisation
+        // Cas 1: Erreur 401 avec URL de réauthorisation (normal)
         if (billingError.status === 401 && billingError.headers) {
           const reauthorizeUrl = billingError.headers.get('X-Shopify-API-Request-Failure-Reauthorize-Url');
           
           if (reauthorizeUrl) {
             console.log("URL de réauthorisation trouvée:", reauthorizeUrl);
-            // Retourner l'URL pour redirection côté client
             return json({
               redirectToTop: reauthorizeUrl
             });
+          } else {
+            console.log("Erreur 401 sans URL de réauthorisation");
+            return json({ 
+              error: "Impossible de créer l'abonnement. Veuillez réessayer." 
+            }, { status: 500 });
           }
         }
         
-        // Si ce n'est pas le cas, relancer l'erreur
-        throw billingError;
+        // Cas 2: Autres types d'erreurs
+        console.error("Erreur billing non gérée:", billingError);
+        return json({ 
+          error: `Erreur lors de la création de l'abonnement: ${billingError.message || 'Erreur inconnue'}` 
+        }, { status: 500 });
       }
     }
     
@@ -164,7 +208,7 @@ const plans = [
 ];
 
 export default function Billing() {
-  const { subscription, hasActivePayment, error } = useLoaderData();
+  const { subscription, hasActivePayment, error, successReturn, showSuccessPage, chargeId } = useLoaderData();
   const submit = useSubmit();
   const actionData = useActionData();
   const navigation = useNavigation();
@@ -177,6 +221,81 @@ export default function Billing() {
       window.top.location.href = actionData.redirectToTop;
     }
   }, [actionData]);
+
+  // Si c'est une page de succès, afficher le message de confirmation
+  if (showSuccessPage) {
+    return (
+      <Page title="Abonnement confirmé !">
+        <Layout>
+          <Layout.Section>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '60vh',
+              textAlign: 'center'
+            }}>
+              <div style={{ fontSize: '4rem', marginBottom: '2rem' }}>🎉</div>
+              
+              <Text variant="heading2xl" as="h1" alignment="center">
+                Félicitations !
+              </Text>
+              
+              <Text variant="headingLg" as="h2" alignment="center" tone="subdued">
+                Votre abonnement à ecom-kit a été confirmé
+              </Text>
+              
+              <div style={{
+                backgroundColor: '#e8f5e8',
+                padding: '2rem',
+                borderRadius: '12px',
+                margin: '2rem 0',
+                border: '2px solid #00a86b',
+                maxWidth: '500px'
+              }}>
+                <Text variant="headingMd" as="h3" alignment="center">
+                  ✅ Votre essai gratuit de 7 jours a commencé !
+                </Text>
+                <Text alignment="center" tone="subdued">
+                  ID de transaction : {chargeId}
+                </Text>
+              </div>
+
+              <div style={{
+                backgroundColor: '#f8f9fa',
+                padding: '2rem',
+                borderRadius: '8px',
+                marginBottom: '2rem',
+                textAlign: 'left',
+                maxWidth: '600px'
+              }}>
+                <Text variant="headingMd" as="h3">
+                  Prochaines étapes :
+                </Text>
+                <div style={{ marginTop: '1rem' }}>
+                  <Text as="p">• Retournez à votre admin Shopify</Text>
+                  <Text as="p">• Cliquez sur "Apps" dans le menu de gauche</Text>
+                  <Text as="p">• Trouvez et cliquez sur "ecom-kit"</Text>
+                  <Text as="p">• Commencez à configurer vos extensions !</Text>
+                </div>
+              </div>
+
+              <Button
+                variant="primary"
+                size="large"
+                onClick={() => {
+                  window.top.location.href = 'https://admin.shopify.com';
+                }}
+              >
+                Retourner à Shopify Admin
+              </Button>
+            </div>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
 
   const handleSubscribe = (planId) => {
     console.log("Clic sur plan:", planId);
@@ -195,20 +314,22 @@ export default function Billing() {
   return (
     <Page title="Facturation">
       <Layout>
-        {/* Message de debug */}
-        <Layout.Section>
-          <Card>
-            <Text as="h3" variant="headingMd">État de l'abonnement</Text>
-            <Text as="p">
-              Subscription: {subscription ? JSON.stringify(subscription) : "Aucun"}<br/>
-              Has Active Payment: {hasActivePayment ? "Oui" : "Non"}<br/>
-              Error: {error || "Aucune"}
-            </Text>
-          </Card>
-        </Layout.Section>
+        {/* Message de debug - temporaire */}
+        {!showSuccessPage && (
+          <Layout.Section>
+            <Card>
+              <Text as="h3" variant="headingMd">État de l'abonnement</Text>
+              <Text as="p">
+                Subscription: {subscription ? JSON.stringify(subscription) : "Aucun"}<br/>
+                Has Active Payment: {hasActivePayment ? "Oui" : "Non"}<br/>
+                Error: {error || "Aucune"}
+              </Text>
+            </Card>
+          </Layout.Section>
+        )}
 
         {/* Abonnement actif */}
-        {subscription && (
+        {!showSuccessPage && subscription && (
           <Layout.Section>
             <Banner title={`Abonné au plan ${subscription.name}`} tone="success">
               <Button onClick={handleCancel} tone="critical">
@@ -219,7 +340,7 @@ export default function Billing() {
         )}
 
         {/* Erreurs */}
-        {actionData?.error && (
+        {!showSuccessPage && actionData?.error && (
           <Layout.Section>
             <Banner tone="critical" title="Erreur">
               {actionData.error}
@@ -227,44 +348,55 @@ export default function Billing() {
           </Layout.Section>
         )}
 
+        {/* Message de succès */}
+        {!showSuccessPage && actionData?.success && (
+          <Layout.Section>
+            <Banner tone="success" title="Succès">
+              {actionData.message}
+            </Banner>
+          </Layout.Section>
+        )}
+
         {/* Plans disponibles */}
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text variant="headingLg" as="h2">Choisissez votre plan</Text>
-              
-              {plans.map((plan) => (
-                <Card key={plan.id} sectioned>
-                  <BlockStack gap="300">
-                    <InlineStack align="space-between">
-                      <Text variant="headingMd">{plan.name}</Text>
-                      {plan.popular && <Badge tone="attention">Populaire</Badge>}
-                      {plan.savings && <Badge tone="success">{plan.savings}</Badge>}
-                    </InlineStack>
-                    
-                    <Text variant="headingLg">{plan.price}</Text>
-                    <Text tone="subdued">{plan.interval}</Text>
-                    
-                    <BlockStack gap="100">
-                      {plan.features.map((feature, index) => (
-                        <Text key={index}>✓ {feature}</Text>
-                      ))}
+        {!showSuccessPage && (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingLg" as="h2">Choisissez votre plan</Text>
+                
+                {plans.map((plan) => (
+                  <Card key={plan.id} sectioned>
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between">
+                        <Text variant="headingMd">{plan.name}</Text>
+                        {plan.popular && <Badge tone="attention">Populaire</Badge>}
+                        {plan.savings && <Badge tone="success">{plan.savings}</Badge>}
+                      </InlineStack>
+                      
+                      <Text variant="headingLg">{plan.price}</Text>
+                      <Text tone="subdued">{plan.interval}</Text>
+                      
+                      <BlockStack gap="100">
+                        {plan.features.map((feature, index) => (
+                          <Text key={index}>✓ {feature}</Text>
+                        ))}
+                      </BlockStack>
+                      
+                      <Button
+                        variant={plan.popular ? "primary" : "secondary"}
+                        onClick={() => handleSubscribe(plan.id)}
+                        loading={isLoading}
+                        fullWidth
+                      >
+                        Choisir ce plan
+                      </Button>
                     </BlockStack>
-                    
-                    <Button
-                      variant={plan.popular ? "primary" : "secondary"}
-                      onClick={() => handleSubscribe(plan.id)}
-                      loading={isLoading}
-                      fullWidth
-                    >
-                      Choisir ce plan
-                    </Button>
-                  </BlockStack>
-                </Card>
-              ))}
-            </BlockStack>
-          </Card>
-        </Layout.Section>
+                  </Card>
+                ))}
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        )}
       </Layout>
     </Page>
   );
