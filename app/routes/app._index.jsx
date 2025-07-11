@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { useFetcher, Link } from "@remix-run/react";
+import { useFetcher, Link, useLoaderData } from "@remix-run/react";
+import { json, redirect } from "@remix-run/node";
 import {
   Page,
   Layout,
@@ -11,13 +12,29 @@ import {
   List,
   InlineStack,
   Divider,
+  Badge,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { getSubscriptionStatus } from "../models/Subscription.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-  return null;
+  const { admin } = await authenticate.admin(request);
+  
+  // Vérifier le statut d'abonnement avec GraphQL
+  const subscriptionData = await getSubscriptionStatus(admin.graphql);
+  const hasActiveSubscription = 
+    subscriptionData?.data?.app?.installation?.activeSubscriptions?.length > 0 &&
+    subscriptionData?.data?.app?.installation?.activeSubscriptions?.[0]?.status === "ACTIVE";
+  
+  // Si pas d'abonnement actif, rediriger vers la facturation
+  if (!hasActiveSubscription) {
+    return redirect("/app/billing");
+  }
+  
+  return json({ 
+    subscription: subscriptionData?.data?.app?.installation?.activeSubscriptions?.[0]
+  });
 };
 
 export const action = async ({ request }) => {
@@ -27,6 +44,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Index() {
+  const { subscription } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
 
@@ -95,7 +113,7 @@ export default function Index() {
       </TitleBar>
       
       <BlockStack gap="800">
-        {/* En-tête de bienvenue */}
+        {/* En-tête de bienvenue avec info abonnement */}
         <Layout>
           <Layout.Section>
             <Card>
@@ -105,6 +123,11 @@ export default function Index() {
                     <Text as="h1" variant="headingLg">
                       Bienvenue dans Ecomkit 🚀
                     </Text>
+                    {subscription && (
+                      <Badge tone="success">
+                        Plan {subscription.name} actif
+                      </Badge>
+                    )}
                   </InlineStack>
                   <Text variant="bodyLg" as="p" tone="subdued">
                     Votre suite d'extensions pour optimiser l'expérience d'achat et booster vos conversions

@@ -9,8 +9,8 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 export const loader = async ({ request }) => {
   // Authenticate with Shopify credentials to handle server-side queries
   const { authenticate } = await import("../shopify.server");
-  // Get session information
-  const { session } = await authenticate.admin(request);
+  // Get session information - PAS de vérification billing ici comme dans l'exemple qui marche
+  await authenticate.admin(request);
   
   // Return the API key for the app
   return {
