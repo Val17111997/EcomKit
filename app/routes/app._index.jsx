@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useFetcher, Link, useLoaderData } from "@remix-run/react";
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import {
   Page,
   Layout,
@@ -16,25 +16,27 @@ import {
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { getSubscriptionStatus } from "../models/Subscription.server";
 
 export const loader = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  
-  // Vérifier le statut d'abonnement avec GraphQL
-  const subscriptionData = await getSubscriptionStatus(admin.graphql);
-  const hasActiveSubscription = 
-    subscriptionData?.data?.app?.installation?.activeSubscriptions?.length > 0 &&
-    subscriptionData?.data?.app?.installation?.activeSubscriptions?.[0]?.status === "ACTIVE";
-  
-  // Si pas d'abonnement actif, rediriger vers la facturation
-  if (!hasActiveSubscription) {
-    return redirect("/app/billing");
+  try {
+    const { admin } = await authenticate.admin(request);
+    
+    console.log("Admin authentifié avec succès");
+    
+    // Pour l'instant, on va juste retourner des données de base sans vérifier les abonnements
+    return json({ 
+      subscription: null,
+      hasActiveSubscription: false,
+      debug: "Loader exécuté avec succès"
+    });
+  } catch (error) {
+    console.error("Erreur dans loader:", error);
+    return json({ 
+      subscription: null,
+      hasActiveSubscription: false,
+      error: error.message
+    });
   }
-  
-  return json({ 
-    subscription: subscriptionData?.data?.app?.installation?.activeSubscriptions?.[0]
-  });
 };
 
 export const action = async ({ request }) => {
@@ -44,7 +46,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Index() {
-  const { subscription } = useLoaderData();
+  const { subscription, hasActiveSubscription, debug, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
 
@@ -56,10 +58,7 @@ export default function Index() {
       features: [
         "Barre de progression avec paliers de réduction",
         "Produits offerts automatiques selon le montant",
-        "Section produits complémentaires",
-        "Codes de réduction intégrés",
-        "Messages d'annonce personnalisés",
-        "Design entièrement personnalisable"
+        "Section produits complémentaires"
       ],
       configUrl: "/app/offers-settings"
     },
@@ -70,10 +69,7 @@ export default function Index() {
       features: [
         "Sélection interactive de variantes",
         "Toast notifications élégants",
-        "Validation intelligente des choix",
-        "Intégration parfaite avec le thème",
-        "Propriétés de panier personnalisées",
-        "Messages de validation configurables"
+        "Validation intelligente des choix"
       ],
       configUrl: "/app/setup-packbuilder"
     },
@@ -84,10 +80,7 @@ export default function Index() {
       features: [
         "Cartes visuelles pour chaque variante",
         "Badges personnalisables par variante",
-        "Prix barrés automatiques",
-        "Métadonnées produit (poids, doses)",
-        "Sélection par défaut configurable",
-        "Design responsive et moderne"
+        "Prix barrés automatiques"
       ],
       configUrl: "/app/setup-bundlecard"
     },
@@ -98,10 +91,7 @@ export default function Index() {
       features: [
         "Interface de construction de pack intuitive",
         "Système de paliers avec réductions progressives",
-        "Sauvegarde automatique de la sélection",
-        "Calcul de livraison offerte en temps réel",
-        "Groupage intelligent dans le panier",
-        "Optimisé mobile avec animations"
+        "Sauvegarde automatique de la sélection"
       ],
       configUrl: "/app/setup-ultimatepack"
     }
@@ -113,6 +103,18 @@ export default function Index() {
       </TitleBar>
       
       <BlockStack gap="800">
+        {/* Debug info */}
+        {debug && (
+          <Layout>
+            <Layout.Section>
+              <Card>
+                <Text as="p" tone="success">✅ {debug}</Text>
+                {error && <Text as="p" tone="critical">❌ Erreur: {error}</Text>}
+              </Card>
+            </Layout.Section>
+          </Layout>
+        )}
+
         {/* En-tête de bienvenue avec info abonnement */}
         <Layout>
           <Layout.Section>
@@ -123,11 +125,9 @@ export default function Index() {
                     <Text as="h1" variant="headingLg">
                       Bienvenue dans Ecomkit 🚀
                     </Text>
-                    {subscription && (
-                      <Badge tone="success">
-                        Plan {subscription.name} actif
-                      </Badge>
-                    )}
+                    <Badge tone="warning">
+                      Version de test
+                    </Badge>
                   </InlineStack>
                   <Text variant="bodyLg" as="p" tone="subdued">
                     Votre suite d'extensions pour optimiser l'expérience d'achat et booster vos conversions
