@@ -1,37 +1,28 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "9bff45cadb4459aae2d01c2dd2685d7e"
-name = "EcomKit"
-handle = "ecomkit-2"
-application_url = "https://revelation-redeem-lying-latex.trycloudflare.com"
+client_id = "12cef638ec0c369730c3c21c3372f0c9"
+name = "ecom-kit"
+handle = "ecom-kit-2"
+application_url = "https://ecomkit.fly.dev"
 embedded = true
-access_scopes = { }
 
 [build]
 include_config_on_deploy = true
 automatically_update_urls_on_dev = true
 
 [webhooks]
-api_version = "2025-01"
+api_version = "2025-04"
 
-  [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products,read_products,read_orders,read_customers,write_payment_terms"
 
 [auth]
 redirect_urls = [
-  "https://revelation-redeem-lying-latex.trycloudflare.com/auth/callback",
-  "https://revelation-redeem-lying-latex.trycloudflare.com/auth/shopify/callback",
-  "https://revelation-redeem-lying-latex.trycloudflare.com/api/auth/callback"
+  "https://ecomkit.fly.dev/auth/callback",
+  "https://ecomkit.fly.dev/auth/shopify/callback",
+  "https://ecomkit.fly.dev/api/auth/callback"
 ]
 
 [pos]
 embedded = false
-
-[[extensions]]
-type = "theme_app_extension"
-name = "EcomKit Theme Extension"
