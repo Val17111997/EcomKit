@@ -72,8 +72,9 @@ export const action = async ({ request }) => {
   try {
     console.log("=== ACTION START ===");
     
-    const { billing } = await authenticate.admin(request);
-    console.log("Authentification action réussie");
+    const { billing, session } = await authenticate.admin(request);
+    const { shop } = session;
+    console.log("Authentification action réussie pour shop:", shop);
     
     const formData = await request.formData();
     const action = formData.get("action");
@@ -84,28 +85,17 @@ export const action = async ({ request }) => {
     if (action === "subscribe") {
       console.log("Début création abonnement pour:", plan);
       
-      console.log("Tentative billing.request avec paramètres:", {
-        plan: plan,
-        isTest: true,
-        returnUrl: `${process.env.SHOPIFY_APP_URL}/app/billing?success=1`
-      });
-      
       try {
-        // URL de retour - utiliser l'URL locale en développement
-        const url = new URL(request.url);
-        const isDev = url.hostname.includes('trycloudflare.com') || url.hostname === 'localhost';
-        
-        let returnUrl;
-        if (isDev) {
-          // En développement, utiliser l'URL du tunnel CloudFlare
-          returnUrl = `${url.protocol}//${url.host}/app/billing/return`;
-        } else {
-          // En production, utiliser l'URL de production
-          returnUrl = `https://ecomkit.fly.dev/app/billing/return`;
-        }
+        // URL de retour vers l'admin Shopify avec le bon handle d'app
+        const returnUrl = `https://${shop}/admin/apps/ecom-kit-2/app/billing?success=1`;
         
         console.log("URL de retour calculée:", returnUrl);
-        console.log("Environnement détecté:", isDev ? "Développement" : "Production");
+        
+        console.log("Tentative billing.request avec paramètres:", {
+          plan: plan,
+          isTest: true,
+          returnUrl: returnUrl
+        });
         
         const response = await billing.request({
           plan: plan,
