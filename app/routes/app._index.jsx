@@ -85,8 +85,17 @@ export default function Index() {
 
   useEffect(() => {
     if (confirmationUrl) {
-      const redirect = Redirect.create(shopify);
-      redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+      try {
+        const redirect = Redirect.create(shopify);
+        if (typeof redirect.dispatch === "function") {
+          redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+          return;
+        }
+      } catch (_) {}
+
+      if (typeof window !== "undefined" && window.top) {
+        window.top.location.assign(confirmationUrl);
+      }
     }
   }, [confirmationUrl, shopify]);
 
