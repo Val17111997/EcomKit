@@ -30,3 +30,12 @@ model Session {
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
 }
+
+model UsageSubscription {
+  id             Int      @id @default(autoincrement())
+  shop           String   @unique
+  subscriptionId String
+  lineItemId     String
+  orderCount     Int      @default(0)
+  cycleStart     DateTime
+}

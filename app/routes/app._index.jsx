@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useFetcher, Link, useLoaderData } from "@remix-run/react";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import {
   Page,
   Layout,
@@ -16,26 +16,59 @@ import {
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   try {
-    const { admin } = await authenticate.admin(request);
-    
-    console.log("Admin authentifié avec succès");
-    
-    // Pour l'instant, on va juste retourner des données de base sans vérifier les abonnements
-    return json({ 
-      subscription: null,
-      hasActiveSubscription: false,
-      debug: "Loader exécuté avec succès"
-    });
+    const { admin, session } = await authenticate.admin(request);
+    const { shop } = session;
+
+    let usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+
+    if (!usage) {
+      const returnUrl = `${process.env.SHOPIFY_APP_URL}/app`;
+      const result = await admin.graphql(`
+        mutation createSub($returnUrl: URL!) {
+          appSubscriptionCreate(
+            name: "Abonnement commandes mensuelles",
+            returnUrl: $returnUrl,
+            lineItems: [{ plan: { appUsagePricingDetails: {
+              cappedAmount: { amount: 39.90, currencyCode: EUR }
+              terms: "Gratuit jusqu’à 30 commandes/mois. 31 à 300 commandes/mois : 19,90 €. Plus de 300 commandes/mois : 39,90 €."
+            } } }],
+            trialDays: 7
+          ) {
+            confirmationUrl
+            appSubscription { id lineItems { id } }
+            userErrors { field message }
+          }
+        }
+      `, { variables: { returnUrl } });
+
+      const data = await result.json();
+      const payload = data.data.appSubscriptionCreate;
+      if (payload.userErrors?.length) {
+        throw new Error(payload.userErrors.map(e => e.message).join(", "));
+      }
+      await prisma.usageSubscription.create({
+        data: {
+          shop,
+          subscriptionId: payload.appSubscription.id,
+          lineItemId: payload.appSubscription.lineItems[0].id,
+          cycleStart: new Date(),
+        },
+      });
+      return redirect(payload.confirmationUrl);
+    }
+
+    let nextPrice = 0;
+    if (usage.orderCount > 300) nextPrice = 39.90;
+    else if (usage.orderCount > 30) nextPrice = 19.90;
+
+    return json({ orderCount: usage.orderCount, nextPrice });
   } catch (error) {
     console.error("Erreur dans loader:", error);
-    return json({ 
-      subscription: null,
-      hasActiveSubscription: false,
-      error: error.message
-    });
+    return json({ error: error.message });
   }
 };
 
@@ -46,7 +79,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Index() {
-  const { subscription, hasActiveSubscription, debug, error } = useLoaderData();
+  const { orderCount, nextPrice, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
 
@@ -103,19 +136,26 @@ export default function Index() {
       </TitleBar>
       
       <BlockStack gap="800">
-        {/* Debug info */}
-        {debug && (
-          <Layout>
-            <Layout.Section>
-              <Card>
-                <Text as="p" tone="success">✅ {debug}</Text>
+        {/* Informations de consommation */}
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="200">
+                <Text variant="headingMd" as="h2">Votre consommation ce mois-ci</Text>
+                <Text as="p">{orderCount ?? 0} commandes</Text>
+                <Text as="p" tone="subdued">
+                  Montant prévisionnel : {nextPrice === 0 ? "gratuit" : `${nextPrice}€`}
+                </Text>
+                <Text tone="subdued" as="p">
+                  Gratuit jusqu’à 30 commandes, 19,90 € jusqu’à 300, puis 39,90 €.
+                </Text>
                 {error && <Text as="p" tone="critical">❌ Erreur: {error}</Text>}
-              </Card>
-            </Layout.Section>
-          </Layout>
-        )}
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
 
-        {/* En-tête de bienvenue avec info abonnement */}
+        {/* En-tête de bienvenue */}
         <Layout>
           <Layout.Section>
             <Card>

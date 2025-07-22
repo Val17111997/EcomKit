@@ -4,17 +4,11 @@ import {
   AppDistribution,
   DeliveryMethod,
   shopifyApp,
-  BillingInterval,
-  BillingReplacementBehavior,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import { restResources } from "@shopify/shopify-api/rest/admin/2024-01";
 import prisma from "./db.server";
 
-export const BASIC_MONTHLY_PLAN = "Basic Monthly";
-export const PREMIUM_MONTHLY_PLAN = "Premium Monthly";
-export const BASIC_ANNUAL_PLAN = "Basic Annual";
-export const PREMIUM_ANNUAL_PLAN = "Premium Annual";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -26,42 +20,20 @@ const shopify = shopifyApp({
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
   restResources,
-  billing: {
-    [BASIC_MONTHLY_PLAN]: {
-      interval: BillingInterval.Every30Days,
-      amount: 19.90,
-      currencyCode: "EUR",
-      trialDays: 7,
-      replacementBehavior: BillingReplacementBehavior.ApplyImmediately,
-    },
-    [PREMIUM_MONTHLY_PLAN]: {
-      interval: BillingInterval.Every30Days,
-      amount: 29.90,
-      currencyCode: "EUR",
-      trialDays: 7,
-      replacementBehavior: BillingReplacementBehavior.ApplyImmediately,
-    },
-    [BASIC_ANNUAL_PLAN]: {
-      interval: BillingInterval.Annual,
-      amount: 199.90,
-      currencyCode: "EUR",
-      trialDays: 7,
-      replacementBehavior: BillingReplacementBehavior.ApplyImmediately,
-    },
-    [PREMIUM_ANNUAL_PLAN]: {
-      interval: BillingInterval.Annual,
-      amount: 299.90,
-      currencyCode: "EUR",
-      trialDays: 7,
-      replacementBehavior: BillingReplacementBehavior.ApplyImmediately,
-    },
-  },
   webhooks: {
     APP_UNINSTALLED: {
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl: "/webhooks",
     },
     APP_SUBSCRIPTIONS_UPDATE: {
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl: "/webhooks",
+    },
+    APP_SUBSCRIPTIONS_BILLING_CYCLE_RENEWED: {
+      deliveryMethod: DeliveryMethod.Http,
+      callbackUrl: "/webhooks",
+    },
+    ORDERS_CREATE: {
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl: "/webhooks",
     },
