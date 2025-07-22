@@ -25,7 +25,7 @@ export const loader = async ({ request }) => {
     const { shop } = session;
 
     let usage = await prisma.usageSubscription.findUnique({ where: { shop } });
-    let subscriptionActive = false;
+    let subscriptionStatus = null;
 
     if (usage) {
       try {
@@ -34,14 +34,17 @@ export const loader = async ({ request }) => {
           { variables: { id: usage.subscriptionId } }
         );
         const checkJson = await check.json();
-        const status = checkJson?.data?.node?.status;
-        subscriptionActive = status === "ACTIVE";
+        subscriptionStatus = checkJson?.data?.node?.status;
       } catch (err) {
         console.error("Erreur vérification abonnement:", err);
       }
     }
 
-    if (!usage || !subscriptionActive) {
+    if (!usage || subscriptionStatus !== "ACTIVE") {
+      if (usage && subscriptionStatus === "PENDING" && usage.confirmationUrl) {
+        return json({ confirmationUrl: usage.confirmationUrl });
+      }
+
       const returnUrl = `${process.env.SHOPIFY_APP_URL}/app`;
       const result = await admin.graphql(`
         mutation createSub($returnUrl: URL!) {
@@ -50,7 +53,7 @@ export const loader = async ({ request }) => {
             returnUrl: $returnUrl,
             lineItems: [{ plan: { appUsagePricingDetails: {
               cappedAmount: { amount: 39.90, currencyCode: EUR }
-              terms: "Gratuit jusqu’à 30 commandes/mois. 31 à 300 commandes/mois : 19,90 €. Plus de 300 commandes/mois : 39,90 €."
+              terms: "Gratuit jusqu'à 30 commandes/mois. 31 à 300 commandes/mois : 19,90 €. Plus de 300 commandes/mois : 39,90 €."
             } } }],
             trialDays: 7
           ) {
@@ -73,6 +76,7 @@ export const loader = async ({ request }) => {
           data: {
             subscriptionId: payload.appSubscription.id,
             lineItemId: payload.appSubscription.lineItems[0].id,
+            confirmationUrl: payload.confirmationUrl,
             orderCount: 0,
             cycleStart: new Date(),
           },
@@ -83,6 +87,7 @@ export const loader = async ({ request }) => {
             shop,
             subscriptionId: payload.appSubscription.id,
             lineItemId: payload.appSubscription.lineItems[0].id,
+            confirmationUrl: payload.confirmationUrl,
             cycleStart: new Date(),
           },
         });
@@ -244,7 +249,7 @@ export default function Index() {
                   Montant prévisionnel : {nextPrice === 0 ? "gratuit" : `${nextPrice}€`}
                 </Text>
                 <Text tone="subdued" as="p">
-                  Gratuit jusqu’à 30 commandes, 19,90 € jusqu’à 300, puis 39,90 €.
+                  Gratuit jusqu'à 30 commandes, 19,90 € jusqu'à 300, puis 39,90 €.
                 </Text>
                 {error && <Text as="p" tone="critical">❌ Erreur: {error}</Text>}
               </BlockStack>

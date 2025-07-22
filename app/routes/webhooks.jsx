@@ -77,6 +77,14 @@ export const action = async ({ request }) => {
               // TODO: Désactiver les fonctionnalités de l'app pour ce shop
             } else if (subscriptionStatus === "ACTIVE") {
               console.log(`[WEBHOOK] Abonnement ACTIF - fonctionnalités activées`);
+              try {
+                await db.usageSubscription.update({
+                  where: { shop },
+                  data: { confirmationUrl: null },
+                });
+              } catch (err) {
+                console.error(`[WEBHOOK] Erreur mise à jour confirmationUrl: ${err.message}`);
+              }
               // TODO: Activer les fonctionnalités de l'app pour ce shop
             }
             
@@ -85,6 +93,14 @@ export const action = async ({ request }) => {
           }
           break;
           
+        case "CUSTOMERS_DATA_REQUEST":
+          console.log(`[WEBHOOK] Demande de données client pour ${shop}`);
+          // Retourner les données client si vous en stockez
+          break;
+          
+        case "CUSTOMERS_REDACT":
+          console.log(`[WEBHOOK] Suppression données client pour ${shop}`);
+          // Supprimer les données client si vous en stockez
           break;
           
         case "SHOP_REDACT":
