@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { useFetcher, Link, useLoaderData } from "@remix-run/react";
-import { json, redirect } from "@remix-run/node";
+import { Link, useLoaderData } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import {
   Page,
   Layout,
@@ -15,6 +15,7 @@ import {
   Badge,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { Redirect } from "@shopify/app-bridge/actions";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
@@ -58,7 +59,7 @@ export const loader = async ({ request }) => {
           cycleStart: new Date(),
         },
       });
-      return redirect(payload.confirmationUrl);
+      return json({ confirmationUrl: payload.confirmationUrl });
     }
 
     let nextPrice = 0;
@@ -79,9 +80,29 @@ export const action = async ({ request }) => {
 };
 
 export default function Index() {
-  const { orderCount, nextPrice, error } = useLoaderData();
-  const fetcher = useFetcher();
+  const { orderCount, nextPrice, error, confirmationUrl } = useLoaderData();
   const shopify = useAppBridge();
+
+  useEffect(() => {
+    if (confirmationUrl) {
+      const redirect = Redirect.create(shopify);
+      redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+    }
+  }, [confirmationUrl, shopify]);
+
+  if (confirmationUrl) {
+    return (
+      <Page>
+        <Layout>
+          <Layout.Section>
+            <Card>
+              <Text>Redirection vers la page de souscription…</Text>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
 
   const extensions = [
     {
