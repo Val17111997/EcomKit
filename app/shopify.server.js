@@ -29,10 +29,6 @@ const shopify = shopifyApp({
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl: "/webhooks",
     },
-    APP_SUBSCRIPTIONS_BILLING_CYCLE_RENEWED: {
-      deliveryMethod: DeliveryMethod.Http,
-      callbackUrl: "/webhooks",
-    },
     ORDERS_CREATE: {
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl: "/webhooks",
