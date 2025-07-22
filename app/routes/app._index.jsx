@@ -81,23 +81,29 @@ export const action = async ({ request }) => {
 
 export default function Index() {
   const { orderCount, nextPrice, error, confirmationUrl } = useLoaderData();
-  const shopify = useAppBridge();
+  const app = useAppBridge();
 
   useEffect(() => {
-    if (confirmationUrl) {
+    if (!confirmationUrl) return;
+
+    const isEmbedded = typeof window !== "undefined" && window.self !== window.top;
+
+    if (isEmbedded) {
       try {
-        const redirect = Redirect.create(shopify);
-        if (typeof redirect.dispatch === "function") {
+        const redirect = Redirect.create(app);
+        if (redirect && typeof redirect.dispatch === "function") {
           redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
           return;
         }
       } catch (_) {}
 
       if (typeof window !== "undefined" && window.top) {
-        window.top.location.assign(confirmationUrl);
+        window.top.location.href = confirmationUrl;
       }
+    } else if (typeof window !== "undefined") {
+      window.location.href = confirmationUrl;
     }
-  }, [confirmationUrl, shopify]);
+  }, [confirmationUrl, app]);
 
   if (confirmationUrl) {
     return (
