@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLoaderData } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import {
@@ -25,8 +25,23 @@ export const loader = async ({ request }) => {
     const { shop } = session;
 
     let usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+    let subscriptionActive = false;
 
-    if (!usage) {
+    if (usage) {
+      try {
+        const check = await admin.graphql(
+          `query($id: ID!) { node(id: $id) { ... on AppSubscription { status } } }`,
+          { variables: { id: usage.subscriptionId } }
+        );
+        const checkJson = await check.json();
+        const status = checkJson?.data?.node?.status;
+        subscriptionActive = status === "ACTIVE";
+      } catch (err) {
+        console.error("Erreur vérification abonnement:", err);
+      }
+    }
+
+    if (!usage || !subscriptionActive) {
       const returnUrl = `${process.env.SHOPIFY_APP_URL}/app`;
       const result = await admin.graphql(`
         mutation createSub($returnUrl: URL!) {
@@ -49,16 +64,30 @@ export const loader = async ({ request }) => {
       const data = await result.json();
       const payload = data.data.appSubscriptionCreate;
       if (payload.userErrors?.length) {
-        throw new Error(payload.userErrors.map(e => e.message).join(", "));
+        throw new Error(payload.userErrors.map((e) => e.message).join(", "));
       }
-      await prisma.usageSubscription.create({
-        data: {
-          shop,
-          subscriptionId: payload.appSubscription.id,
-          lineItemId: payload.appSubscription.lineItems[0].id,
-          cycleStart: new Date(),
-        },
-      });
+
+      if (usage) {
+        await prisma.usageSubscription.update({
+          where: { shop },
+          data: {
+            subscriptionId: payload.appSubscription.id,
+            lineItemId: payload.appSubscription.lineItems[0].id,
+            orderCount: 0,
+            cycleStart: new Date(),
+          },
+        });
+      } else {
+        await prisma.usageSubscription.create({
+          data: {
+            shop,
+            subscriptionId: payload.appSubscription.id,
+            lineItemId: payload.appSubscription.lineItems[0].id,
+            cycleStart: new Date(),
+          },
+        });
+      }
+
       return json({ confirmationUrl: payload.confirmationUrl });
     }
 
@@ -82,32 +111,60 @@ export const action = async ({ request }) => {
 export default function Index() {
   const { orderCount, nextPrice, error, confirmationUrl } = useLoaderData();
   const app = useAppBridge();
-  const [manualRedirect, setManualRedirect] = React.useState(false);
+  const [manual, setManual] = useState(false);
 
   useEffect(() => {
-    if (!confirmationUrl) return;
+    if (!confirmationUrl) {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("billing_redirected");
+      }
+      return;
+    }
+
+    const alreadyTried = typeof window !== "undefined" ? sessionStorage.getItem("billing_redirected") : null;
+    if (alreadyTried && !manual) {
+      setManual(true);
+      return;
+    }
 
     const isEmbedded = typeof window !== "undefined" && window.self !== window.top;
-
     if (isEmbedded) {
       try {
         const redirect = Redirect.create(app);
         if (redirect && typeof redirect.dispatch === "function") {
           redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+          sessionStorage.setItem("billing_redirected", "1");
           return;
         }
       } catch (_) {
-        // App Bridge not ready
+        setManual(true);
+        return;
       }
-
-      // App Bridge unavailable, show manual redirect option
-      setManualRedirect(true);
+      setManual(true);
     } else if (typeof window !== "undefined") {
       window.location.href = confirmationUrl;
+      sessionStorage.setItem("billing_redirected", "1");
     }
-  }, [confirmationUrl, app]);
+  }, [confirmationUrl, app, manual]);
 
   if (confirmationUrl) {
+    if (manual) {
+      return (
+        <Page>
+          <Layout>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="200">
+                  <Text>Merci d&rsquo;approuver l&rsquo;abonnement pour utiliser l&rsquo;app.</Text>
+                  <Button onClick={() => window.open(confirmationUrl, "_blank")}>Rouvrir l&rsquo;approbation</Button>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </Layout>
+        </Page>
+      );
+    }
+
     return (
       <Page>
         <Layout>
@@ -115,9 +172,6 @@ export default function Index() {
             <Card>
               <BlockStack gap="200">
                 <Text>Redirection vers la page de souscription…</Text>
-                {manualRedirect && (
-                  <Button onClick={() => window.open(confirmationUrl, "_blank")}>Ouvrir la page de paiement</Button>
-                )}
               </BlockStack>
             </Card>
           </Layout.Section>
