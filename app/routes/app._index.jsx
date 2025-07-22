@@ -29,9 +29,14 @@ export const loader = async ({ request }) => {
     }
     const { shop } = session;
 
-    let usage = await prisma.usageSubscription.findUnique({ where: { shop } });
-    let subscriptionStatus = null;
+    let usage;
+    try {
+      usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+    } catch (dbErr) {
+      console.error("DB lookup failed:", dbErr);
+    }
 
+    let subscriptionStatus = null;
     if (usage) {
       try {
         const check = await admin.graphql(
@@ -50,65 +55,71 @@ export const loader = async ({ request }) => {
         return json({ confirmationUrl: usage.confirmationUrl });
       }
 
-      const returnUrl = `${process.env.SHOPIFY_APP_URL}/app`;
-      const result = await admin.graphql(`
-        mutation createSub($returnUrl: URL!) {
-          appSubscriptionCreate(
-            name: "Abonnement commandes mensuelles",
-            returnUrl: $returnUrl,
-            lineItems: [{ plan: { appUsagePricingDetails: {
-              cappedAmount: { amount: 39.90, currencyCode: EUR }
-              terms: "Gratuit jusqu'à 30 commandes/mois. 31 à 300 commandes/mois : 19,90 €. Plus de 300 commandes/mois : 39,90 €."
-            } } }],
-            trialDays: 7
-          ) {
-            confirmationUrl
-            appSubscription { id lineItems { id } }
-            userErrors { field message }
-          }
+      try {
+        const returnUrl = `${process.env.SHOPIFY_APP_URL}/app`;
+        const result = await admin.graphql(
+          `mutation createSub($returnUrl: URL!) {
+            appSubscriptionCreate(
+              name: "Abonnement commandes mensuelles",
+              returnUrl: $returnUrl,
+              lineItems: [{ plan: { appUsagePricingDetails: {
+                cappedAmount: { amount: 39.90, currencyCode: EUR }
+                terms: "Gratuit jusqu'à 30 commandes/mois. 31 à 300 commandes/mois : 19,90 €. Plus de 300 commandes/mois : 39,90 €."
+              } } }],
+              trialDays: 7
+            ) {
+              confirmationUrl
+              appSubscription { id lineItems { id } }
+              userErrors { field message }
+            }
+          }`,
+          { variables: { returnUrl } }
+        );
+
+        const data = await result.json();
+        const payload = data.data.appSubscriptionCreate;
+        if (payload.userErrors?.length) {
+          return json({ error: payload.userErrors.map((e) => e.message).join(", ") });
         }
-      `, { variables: { returnUrl } });
 
-      const data = await result.json();
-      const payload = data.data.appSubscriptionCreate;
-      if (payload.userErrors?.length) {
-        throw new Error(payload.userErrors.map((e) => e.message).join(", "));
+        if (usage) {
+          await prisma.usageSubscription.update({
+            where: { shop },
+            data: {
+              subscriptionId: payload.appSubscription.id,
+              lineItemId: payload.appSubscription.lineItems[0].id,
+              confirmationUrl: payload.confirmationUrl,
+              orderCount: 0,
+              cycleStart: new Date(),
+            },
+          });
+        } else {
+          await prisma.usageSubscription.create({
+            data: {
+              shop,
+              subscriptionId: payload.appSubscription.id,
+              lineItemId: payload.appSubscription.lineItems[0].id,
+              confirmationUrl: payload.confirmationUrl,
+              cycleStart: new Date(),
+            },
+          });
+        }
+
+        return json({ confirmationUrl: payload.confirmationUrl });
+      } catch (createErr) {
+        console.error("Erreur création abonnement:", createErr);
+        return json({ error: "Impossible de créer l'abonnement." });
       }
-
-      if (usage) {
-        await prisma.usageSubscription.update({
-          where: { shop },
-          data: {
-            subscriptionId: payload.appSubscription.id,
-            lineItemId: payload.appSubscription.lineItems[0].id,
-            confirmationUrl: payload.confirmationUrl,
-            orderCount: 0,
-            cycleStart: new Date(),
-          },
-        });
-      } else {
-        await prisma.usageSubscription.create({
-          data: {
-            shop,
-            subscriptionId: payload.appSubscription.id,
-            lineItemId: payload.appSubscription.lineItems[0].id,
-            confirmationUrl: payload.confirmationUrl,
-            cycleStart: new Date(),
-          },
-        });
-      }
-
-      return json({ confirmationUrl: payload.confirmationUrl });
     }
 
     let nextPrice = 0;
-    if (usage.orderCount > 300) nextPrice = 39.90;
-    else if (usage.orderCount > 30) nextPrice = 19.90;
+    if (usage && usage.orderCount > 300) nextPrice = 39.90;
+    else if (usage && usage.orderCount > 30) nextPrice = 19.90;
 
-    return json({ orderCount: usage.orderCount, nextPrice });
+    return json({ orderCount: usage?.orderCount ?? 0, nextPrice });
   } catch (error) {
     console.error("Erreur dans loader:", error);
-    return json({ error: error.message });
+    return json({ error: "Une erreur est survenue." });
   }
 };
 
