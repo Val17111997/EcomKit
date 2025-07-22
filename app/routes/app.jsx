@@ -12,7 +12,10 @@ export const loader = async ({ request }) => {
 // Get session information
 const authResult = await authenticate.admin(request);
 if (authResult instanceof Response) return authResult;
-  
+const { session } = authResult;
+if (!session?.shop) {
+  return json({ error: "No shop in session" }, { status: 400 });
+}
   // Return the API key for the app
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",

@@ -28,6 +28,9 @@ export const loader = async ({ request }) => {
   const authResult = await authenticate.admin(request);
   if (authResult instanceof Response) return authResult;
   const { admin, session } = authResult;
+  if (!session?.shop) {
+    return json({ error: "No shop in session" }, { status: 400 });
+  }
   
   try {
     // Structure par défaut pour les offres
@@ -130,6 +133,9 @@ export const action = async ({ request }) => {
   const authResult = await authenticate.admin(request);
   if (authResult instanceof Response) return authResult;
   const { admin, session } = authResult;
+  if (!session?.shop) {
+    return json({ error: "No shop in session" }, { status: 400 });
+  }
   
   try {
     // Récupérer les données du formulaire

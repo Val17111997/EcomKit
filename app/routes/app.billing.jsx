@@ -8,6 +8,9 @@ export const loader = async ({ request }) => {
   const authResult = await authenticate.admin(request);
   if (authResult instanceof Response) return authResult;
   const { session } = authResult;
+  if (!session?.shop) {
+    return json({ error: "No shop in session" }, { status: 400 });
+  }
   const { shop } = session;
 
   const usage = await prisma.usageSubscription.findUnique({ where: { shop } });
