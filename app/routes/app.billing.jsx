@@ -5,7 +5,9 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const authResult = await authenticate.admin(request);
+  if (authResult instanceof Response) return authResult;
+  const { session } = authResult;
   const { shop } = session;
 
   const usage = await prisma.usageSubscription.findUnique({ where: { shop } });

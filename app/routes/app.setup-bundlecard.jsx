@@ -25,7 +25,9 @@ import { CheckSmallIcon, InfoIcon } from '@shopify/polaris-icons';
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const authResult = await authenticate.admin(request);
+  if (authResult instanceof Response) return authResult;
+  const { admin, session } = authResult;
   
   try {
     // Structure par défaut pour les cartes Bundle
@@ -116,7 +118,9 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const authResult = await authenticate.admin(request);
+  if (authResult instanceof Response) return authResult;
+  const { admin, session } = authResult;
   
   try {
     // Récupérer les données du formulaire

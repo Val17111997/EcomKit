@@ -21,7 +21,9 @@ import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   try {
-    const { admin, session } = await authenticate.admin(request);
+    const authResult = await authenticate.admin(request);
+    if (authResult instanceof Response) return authResult;
+    const { admin, session } = authResult;
     const { shop } = session;
 
     let usage = await prisma.usageSubscription.findUnique({ where: { shop } });
@@ -108,7 +110,9 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
+  const authResult = await authenticate.admin(request);
+  if (authResult instanceof Response) return authResult;
+  const { admin } = authResult;
   // Action pour activer/désactiver les extensions si nécessaire
   return { success: true };
 };
