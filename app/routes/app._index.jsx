@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { Link, useLoaderData } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import {
@@ -82,6 +82,7 @@ export const action = async ({ request }) => {
 export default function Index() {
   const { orderCount, nextPrice, error, confirmationUrl } = useLoaderData();
   const app = useAppBridge();
+  const [manualRedirect, setManualRedirect] = React.useState(false);
 
   useEffect(() => {
     if (!confirmationUrl) return;
@@ -95,11 +96,12 @@ export default function Index() {
           redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
           return;
         }
-      } catch (_) {}
-
-      if (typeof window !== "undefined" && window.top) {
-        window.top.location.href = confirmationUrl;
+      } catch (_) {
+        // App Bridge not ready
       }
+
+      // App Bridge unavailable, show manual redirect option
+      setManualRedirect(true);
     } else if (typeof window !== "undefined") {
       window.location.href = confirmationUrl;
     }
@@ -111,7 +113,12 @@ export default function Index() {
         <Layout>
           <Layout.Section>
             <Card>
-              <Text>Redirection vers la page de souscription…</Text>
+              <BlockStack gap="200">
+                <Text>Redirection vers la page de souscription…</Text>
+                {manualRedirect && (
+                  <Button onClick={() => window.open(confirmationUrl, "_blank")}>Ouvrir la page de paiement</Button>
+                )}
+              </BlockStack>
             </Card>
           </Layout.Section>
         </Layout>
