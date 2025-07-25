@@ -44,8 +44,20 @@ export default function App() {
   const redirectToBilling = useCallback(() => {
     if (!confirmationUrl) return;
 
-    const redirect = Redirect.create(app);
-    redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+    try {
+      const redirect = Redirect.create(app);
+      if (redirect && typeof redirect.dispatch === "function") {
+        redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+        return;
+      }
+    } catch (error) {
+      console.warn("App Bridge redirect failed:", error);
+    }
+    
+    // Fallback: redirection directe
+    if (typeof window !== "undefined") {
+      window.top.location.href = confirmationUrl;
+    }
   }, [app, confirmationUrl]);
 
   useEffect(() => {
