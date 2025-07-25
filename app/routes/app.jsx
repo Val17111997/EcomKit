@@ -3,7 +3,8 @@ import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-import { NavMenu, Redirect, useAppBridge } from "@shopify/app-bridge-react";
+import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
+import { Redirect } from "@shopify/app-bridge/actions";
 import {
   Page,
   Layout,
