@@ -22,7 +22,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
 
   if (amount > 0) {
     try {
-      await admin.graphql(
+      const response = await admin.graphql(
         `mutation usage($id: ID!, $price: MoneyInput!) {
           appUsageRecordCreate(
             subscriptionLineItemId: $id,
@@ -34,6 +34,14 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
         }`,
         { variables: { id: usage.lineItemId, price: { amount, currencyCode: "EUR" } } }
       );
+      const json = await response.json();
+      const errors = json?.data?.appUsageRecordCreate?.userErrors;
+      if (errors?.length) {
+        console.error(
+          "[USAGE] Erreurs création usage:",
+          errors.map((e) => e.message).join(", ")
+        );
+      }
     } catch (err) {
       console.error("Erreur facturation usage:", err);
     }

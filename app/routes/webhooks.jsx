@@ -1,6 +1,6 @@
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
-import { processMonthlyUsage } from "../subscription.server";
+import { processMonthlyUsage, ensureActiveSubscription } from "../subscription.server";
 
 export const action = async ({ request }) => {
     try {
@@ -30,6 +30,24 @@ export const action = async ({ request }) => {
   
         case "ORDERS_CREATE":
           try {
+            let usageSubscription = await db.usageSubscription.findUnique({
+              where: { shop },
+            });
+
+            if (!usageSubscription) {
+              await ensureActiveSubscription(admin, shop);
+              usageSubscription = await db.usageSubscription.findUnique({
+                where: { shop },
+              });
+            }
+
+            if (!usageSubscription) {
+              console.error(
+                `[WEBHOOK] Impossible de trouver ou créer usageSubscription pour ${shop}`
+              );
+              break;
+            }
+
             await processMonthlyUsage(admin, shop);
             await db.usageSubscription.update({
               where: { shop },
