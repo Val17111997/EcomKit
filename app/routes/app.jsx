@@ -76,20 +76,33 @@ export default function App() {
                 <InlineStack gap="600" align="center" blockAlign="center">
                   <Card>
                     <Box padding="600">
-                      <BlockStack gap="400" align="center">
-                        <Text as="h2" variant="headingLg" alignment="center">
-                          Abonnement requis
+                      <BlockStack gap="400">
+                        <Text as="h2" variant="headingLg">
+                          Ecomkit
                         </Text>
-                        <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
-                          Merci d'approuver l'abonnement pour utiliser l'app et accéder à toutes les fonctionnalités.
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                          Votre suite d'extensions pour optimiser l'expérience d'achat et booster vos conversions
                         </Text>
+                        
+                        <Text as="p" variant="headingXl">
+                          Gratuit <Text as="span" variant="bodyLg" tone="subdued">puis à usage</Text>
+                        </Text>
+                        
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodyMd">Gratuit jusqu'à 30 commandes</Text>
+                          <Text as="p" variant="bodyMd">19,90 € jusqu'à 300 commandes</Text>
+                          <Text as="p" variant="bodyMd">39,90 € au-delà de 300 commandes</Text>
+                          <Text as="p" variant="bodyMd">Extensions BoostCart, Pack Builder, Bundle Cards</Text>
+                        </BlockStack>
+                        
                         <Box paddingBlockStart="200">
                           <Button 
                             onClick={redirectToBilling}
                             variant="primary"
                             size="large"
+                            fullWidth
                           >
-                            Ouvrir l'approbation
+                            Démarrer
                           </Button>
                         </Box>
                         {error && (
