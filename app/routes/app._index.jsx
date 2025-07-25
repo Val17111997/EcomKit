@@ -82,12 +82,17 @@ export default function Index() {
       const redirect = Redirect.create(app);
       if (redirect && typeof redirect.dispatch === "function") {
         redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-      } else {
-        throw new Error("dispatch unavailable");
+        return;
       }
+      throw new Error("dispatch unavailable");
     } catch (_) {
       if (typeof window !== "undefined") {
-        window.top.location.href = confirmationUrl;
+        try {
+          window.top.location.href = confirmationUrl;
+          return;
+        } catch (_) {
+          window.location.href = confirmationUrl;
+        }
       }
     }
     if (typeof window !== "undefined") {
