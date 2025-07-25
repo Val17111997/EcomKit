@@ -44,17 +44,18 @@ export default function App() {
   const redirectToBilling = useCallback(() => {
     if (!confirmationUrl) return;
 
-    // Redirection directe sans App Bridge
-    if (typeof window !== "undefined") {
-      try {
-        // Essayer d'abord window.top pour les iframes
-        window.top.location.href = confirmationUrl;
-      } catch (e) {
-        // Si window.top échoue, utiliser window.location
-        window.location.href = confirmationUrl;
+    try {
+      const redirect = Redirect.create(app);
+      // Vérifier que dispatch existe et est une fonction
+      if (redirect && typeof redirect.dispatch === 'function') {
+        redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+      } else {
+        console.error('App Bridge dispatch not available');
       }
+    } catch (error) {
+      console.error('App Bridge redirect failed:', error);
     }
-  }, [confirmationUrl]);
+  }, [app, confirmationUrl]);
 
   useEffect(() => {
     if (!confirmationUrl) return;
