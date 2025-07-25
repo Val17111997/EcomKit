@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link, useLoaderData } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import {
@@ -76,6 +76,25 @@ export default function Index() {
   const app = useAppBridge();
   const [manual, setManual] = useState(false);
 
+  const redirectToBilling = useCallback(() => {
+    if (!confirmationUrl) return;
+    try {
+      const redirect = Redirect.create(app);
+      if (redirect && typeof redirect.dispatch === "function") {
+        redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+      } else {
+        throw new Error("dispatch unavailable");
+      }
+    } catch (_) {
+      if (typeof window !== "undefined") {
+        window.top.location.href = confirmationUrl;
+      }
+    }
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("billing_redirected", "1");
+    }
+  }, [app, confirmationUrl]);
+
   useEffect(() => {
     if (!confirmationUrl) {
       if (typeof window !== "undefined") {
@@ -90,16 +109,8 @@ export default function Index() {
       return;
     }
 
-    try {
-      const redirect = Redirect.create(app);
-      redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("billing_redirected", "1");
-      }
-    } catch (_) {
-      setManual(true);
-    }
-  }, [confirmationUrl, app, manual]);
+    redirectToBilling();
+  }, [confirmationUrl, manual, redirectToBilling]);
 
   if (confirmationUrl) {
     if (manual) {
@@ -111,12 +122,7 @@ export default function Index() {
                 <BlockStack gap="200">
                   <Text>Merci d&rsquo;approuver l&rsquo;abonnement pour utiliser l&rsquo;app.</Text>
                   <Button
-                    onClick={() =>
-                      Redirect.create(app).dispatch(
-                        Redirect.Action.REMOTE,
-                        confirmationUrl
-                      )
-                    }
+                    onClick={redirectToBilling}
                   >
                     Rouvrir l&rsquo;approbation
                   </Button>

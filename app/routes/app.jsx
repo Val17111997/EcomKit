@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import { boundary } from "@shopify/shopify-app-remix/server";
@@ -41,14 +41,27 @@ export default function App() {
   const { apiKey, confirmationUrl, error } = useLoaderData();
   const app = useAppBridge();
 
+  const redirectToBilling = useCallback(() => {
+    if (!confirmationUrl) return;
+    try {
+      const redirect = Redirect.create(app);
+      if (redirect && typeof redirect.dispatch === "function") {
+        redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+      } else {
+        throw new Error("dispatch unavailable");
+      }
+    } catch (_) {
+      if (typeof window !== "undefined") {
+        window.top.location.href = confirmationUrl;
+      }
+    }
+  }, [app, confirmationUrl]);
+
   useEffect(() => {
     if (!confirmationUrl) return;
 
-    const redirect = Redirect.create(app);
-    redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-    // If App Bridge is unavailable, the redirect action will gracefully
-    // fall back to a regular navigation handled by Shopify
-  }, [confirmationUrl, app]);
+    redirectToBilling();
+  }, [confirmationUrl, redirectToBilling]);
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
@@ -70,12 +83,7 @@ export default function App() {
                 <BlockStack gap="200">
                   <Text>Merci d&apos;approuver l&apos;abonnement pour utiliser l&apos;app.</Text>
                   <Button
-                    onClick={() =>
-                      Redirect.create(app).dispatch(
-                        Redirect.Action.REMOTE,
-                        confirmationUrl
-                      )
-                    }
+                    onClick={redirectToBilling}
                   >
                     Rouvrir l&apos;approbation
                   </Button>
