@@ -10,6 +10,7 @@ export const action = async ({ request }) => {
   // If this webhook already ran, the session may have been deleted previously.
   if (session) {
     await db.session.deleteMany({ where: { shop } });
+    await db.usageSubscription.deleteMany({ where: { shop } });
   }
 
   return new Response();

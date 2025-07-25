@@ -1,3 +1,7 @@
+import { authenticate } from "../shopify.server";
+import db from "../db.server";
+import { processMonthlyUsage } from "../subscription.server";
+
 export const action = async ({ request }) => {
     try {
       const { topic, shop, session, admin, payload } = await authenticate.webhook(request);
@@ -16,15 +20,17 @@ export const action = async ({ request }) => {
           if (session) {
             try {
               await db.session.deleteMany({ where: { shop } });
-              console.log(`[WEBHOOK] Sessions supprimées pour ${shop}`);
+              await db.usageSubscription.deleteMany({ where: { shop } });
+              console.log(`[WEBHOOK] Sessions et usage supprimés pour ${shop}`);
             } catch (error) {
-              console.error(`[WEBHOOK] Erreur suppression sessions: ${error.message}`);
+              console.error(`[WEBHOOK] Erreur suppression données: ${error.message}`);
             }
           }
           break;
   
         case "ORDERS_CREATE":
           try {
+            await processMonthlyUsage(admin, shop);
             await db.usageSubscription.update({
               where: { shop },
               data: { orderCount: { increment: 1 } },

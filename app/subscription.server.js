@@ -1,5 +1,50 @@
 import prisma from "./db.server";
 
+export async function processMonthlyUsage(admin, shop, existingUsage) {
+  let usage = existingUsage;
+  if (!usage) {
+    usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+  }
+  if (!usage) return null;
+
+  const now = new Date();
+  const cycle = new Date(usage.cycleStart);
+  if (
+    cycle.getUTCFullYear() === now.getUTCFullYear() &&
+    cycle.getUTCMonth() === now.getUTCMonth()
+  ) {
+    return usage;
+  }
+
+  let amount = 0;
+  if (usage.orderCount > 300) amount = 39.9;
+  else if (usage.orderCount > 30) amount = 19.9;
+
+  if (amount > 0) {
+    try {
+      await admin.graphql(
+        `mutation usage($id: ID!, $price: MoneyInput!) {
+          appUsageRecordCreate(
+            subscriptionLineItemId: $id,
+            description: "Monthly usage",
+            price: $price
+          ) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { id: usage.lineItemId, price: { amount, currencyCode: "EUR" } } }
+      );
+    } catch (err) {
+      console.error("Erreur facturation usage:", err);
+    }
+  }
+
+  return await prisma.usageSubscription.update({
+    where: { shop },
+    data: { orderCount: 0, cycleStart: now },
+  });
+}
+
 // Check if the shop has an active subscription. If not, create a new one and return the confirmation URL.
 export async function ensureActiveSubscription(admin, shop) {
   let usage;
@@ -7,6 +52,10 @@ export async function ensureActiveSubscription(admin, shop) {
     usage = await prisma.usageSubscription.findUnique({ where: { shop } });
   } catch (err) {
     console.error("DB lookup failed:", err);
+  }
+
+  if (usage) {
+    usage = await processMonthlyUsage(admin, shop, usage);
   }
 
   let subscriptionStatus = null;
