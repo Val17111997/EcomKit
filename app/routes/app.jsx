@@ -76,15 +76,6 @@ export default function App() {
                   <Button onClick={redirectToBilling}>
                     Ouvrir l&apos;approbation
                   </Button>
-                  <Text as="p">
-                    <a
-                      href={confirmationUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Ouvrir dans un nouvel onglet
-                    </a>
-                  </Text>
                   {error && <Text tone="critical">Erreur: {error}</Text>}
                 </BlockStack>
               </Card>
