@@ -1,7 +1,17 @@
+import React, { useEffect } from "react";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-import { NavMenu } from "@shopify/app-bridge-react";
+import { NavMenu, Redirect, useAppBridge } from "@shopify/app-bridge-react";
+import {
+  Page,
+  Layout,
+  Card,
+  Button,
+  BlockStack,
+  Text,
+} from "@shopify/polaris";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
@@ -9,21 +19,47 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 export const loader = async ({ request }) => {
   // Authenticate with Shopify credentials to handle server-side queries
   const { authenticate } = await import("../shopify.server");
-// Get session information
-const authResult = await authenticate.admin(request);
-if (authResult instanceof Response) return authResult;
-const { session } = authResult;
-if (!session?.shop) {
-  return json({ error: "No shop in session" }, { status: 400 });
-}
-  // Return the API key for the app
-  return {
+  const { ensureActiveSubscription } = await import("../subscription.server");
+  // Get session information
+  const authResult = await authenticate.admin(request);
+  if (authResult instanceof Response) return authResult;
+  const { admin, session } = authResult;
+  if (!session?.shop) {
+    return json({ error: "No shop in session" }, { status: 400 });
+  }
+
+  const billing = await ensureActiveSubscription(admin, session.shop);
+
+  return json({
     apiKey: process.env.SHOPIFY_API_KEY || "",
-  };
+    ...billing,
+  });
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData();
+  const { apiKey, confirmationUrl, error } = useLoaderData();
+  const app = useAppBridge();
+
+  useEffect(() => {
+    if (!confirmationUrl) return;
+
+    const isEmbedded = typeof window !== "undefined" && window.self !== window.top;
+    if (isEmbedded) {
+      try {
+        const redirect = Redirect.create(app);
+        if (redirect && typeof redirect.dispatch === "function") {
+          redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+          return;
+        }
+      } catch (_) {
+        // Fallback below
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.top.location.href = confirmationUrl;
+    }
+  }, [confirmationUrl, app]);
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
@@ -37,7 +73,23 @@ export default function App() {
         <Link to="/app/billing">Votre abonnement</Link>
       </NavMenu>
       
-      <Outlet />
+      {confirmationUrl ? (
+        <Page>
+          <Layout>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="200">
+                  <Text>Merci d&apos;approuver l&apos;abonnement pour utiliser l&apos;app.</Text>
+                  <Button onClick={() => window.open(confirmationUrl, "_top")}>Rouvrir l&apos;approbation</Button>
+                  {error && <Text tone="critical">Erreur: {error}</Text>}
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </Layout>
+        </Page>
+      ) : (
+        <Outlet />
+      )}
     </AppProvider>
   );
 }
