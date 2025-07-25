@@ -43,18 +43,9 @@ export default function App() {
 
   const redirectToBilling = useCallback(() => {
     if (!confirmationUrl) return;
-    try {
-      const redirect = Redirect.create(app);
-      if (redirect && typeof redirect.dispatch === "function") {
-        redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-      } else {
-        throw new Error("dispatch unavailable");
-      }
-    } catch (_) {
-      if (typeof window !== "undefined") {
-        window.top.location.assign(confirmationUrl);
-      }
-    }
+
+    const redirect = Redirect.create(app);
+    redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
   }, [app, confirmationUrl]);
 
   useEffect(() => {
@@ -82,11 +73,18 @@ export default function App() {
               <Card>
                 <BlockStack gap="200">
                   <Text>Merci d&apos;approuver l&apos;abonnement pour utiliser l&apos;app.</Text>
-                  <Button
-                    onClick={redirectToBilling}
-                  >
+                  <Button onClick={redirectToBilling}>
                     Rouvrir l&apos;approbation
                   </Button>
+                  <Text as="p">
+                    <a
+                      href={confirmationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ouvrir dans un nouvel onglet
+                    </a>
+                  </Text>
                   {error && <Text tone="critical">Erreur: {error}</Text>}
                 </BlockStack>
               </Card>

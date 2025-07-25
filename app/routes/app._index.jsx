@@ -78,18 +78,10 @@ export default function Index() {
 
   const redirectToBilling = useCallback(() => {
     if (!confirmationUrl) return;
-    try {
-      const redirect = Redirect.create(app);
-      if (redirect && typeof redirect.dispatch === "function") {
-        redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-        return;
-      }
-      throw new Error("dispatch unavailable");
-    } catch (_) {
-      if (typeof window !== "undefined") {
-        window.top.location.assign(confirmationUrl);
-      }
-    }
+
+    const redirect = Redirect.create(app);
+    redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+
     if (typeof window !== "undefined") {
       sessionStorage.setItem("billing_redirected", "1");
     }
@@ -126,6 +118,15 @@ export default function Index() {
                   >
                     Rouvrir l&rsquo;approbation
                   </Button>
+                  <Text as="p">
+                    <a
+                      href={confirmationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Ouvrir dans un nouvel onglet
+                    </a>
+                  </Text>
                 </BlockStack>
               </Card>
             </Layout.Section>
@@ -141,6 +142,15 @@ export default function Index() {
             <Card>
               <BlockStack gap="200">
                 <Text>Redirection vers la page de souscription…</Text>
+                <Text as="p">
+                  <a
+                    href={confirmationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Cliquez ici si rien ne se passe
+                  </a>
+                </Text>
               </BlockStack>
             </Card>
           </Layout.Section>
