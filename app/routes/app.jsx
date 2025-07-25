@@ -52,7 +52,7 @@ export default function App() {
       }
     } catch (_) {
       if (typeof window !== "undefined") {
-        window.location.href = confirmationUrl;
+        window.top.location.assign(confirmationUrl);
       }
     }
   }, [app, confirmationUrl]);

@@ -87,7 +87,7 @@ export default function Index() {
       throw new Error("dispatch unavailable");
     } catch (_) {
       if (typeof window !== "undefined") {
-        window.location.href = confirmationUrl;
+        window.top.location.assign(confirmationUrl);
       }
     }
     if (typeof window !== "undefined") {
