@@ -90,23 +90,14 @@ export default function Index() {
       return;
     }
 
-    const isEmbedded = typeof window !== "undefined" && window.self !== window.top;
-    if (isEmbedded) {
-      try {
-        const redirect = Redirect.create(app);
-        if (redirect && typeof redirect.dispatch === "function") {
-          redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-          sessionStorage.setItem("billing_redirected", "1");
-          return;
-        }
-      } catch (_) {
-        setManual(true);
-        return;
+    try {
+      const redirect = Redirect.create(app);
+      redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("billing_redirected", "1");
       }
+    } catch (_) {
       setManual(true);
-    } else if (typeof window !== "undefined") {
-      window.location.href = confirmationUrl;
-      sessionStorage.setItem("billing_redirected", "1");
     }
   }, [confirmationUrl, app, manual]);
 
@@ -119,7 +110,16 @@ export default function Index() {
               <Card>
                 <BlockStack gap="200">
                   <Text>Merci d&rsquo;approuver l&rsquo;abonnement pour utiliser l&rsquo;app.</Text>
-                  <Button onClick={() => window.open(confirmationUrl, "_blank")}>Rouvrir l&rsquo;approbation</Button>
+                  <Button
+                    onClick={() =>
+                      Redirect.create(app).dispatch(
+                        Redirect.Action.REMOTE,
+                        confirmationUrl
+                      )
+                    }
+                  >
+                    Rouvrir l&rsquo;approbation
+                  </Button>
                 </BlockStack>
               </Card>
             </Layout.Section>

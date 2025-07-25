@@ -44,22 +44,10 @@ export default function App() {
   useEffect(() => {
     if (!confirmationUrl) return;
 
-    const isEmbedded = typeof window !== "undefined" && window.self !== window.top;
-    if (isEmbedded) {
-      try {
-        const redirect = Redirect.create(app);
-        if (redirect && typeof redirect.dispatch === "function") {
-          redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-          return;
-        }
-      } catch (_) {
-        // Fallback below
-      }
-    }
-
-    if (typeof window !== "undefined") {
-      window.top.location.href = confirmationUrl;
-    }
+    const redirect = Redirect.create(app);
+    redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+    // If App Bridge is unavailable, the redirect action will gracefully
+    // fall back to a regular navigation handled by Shopify
   }, [confirmationUrl, app]);
 
   return (
@@ -81,7 +69,16 @@ export default function App() {
               <Card>
                 <BlockStack gap="200">
                   <Text>Merci d&apos;approuver l&apos;abonnement pour utiliser l&apos;app.</Text>
-                  <Button onClick={() => window.open(confirmationUrl, "_top")}>Rouvrir l&apos;approbation</Button>
+                  <Button
+                    onClick={() =>
+                      Redirect.create(app).dispatch(
+                        Redirect.Action.REMOTE,
+                        confirmationUrl
+                      )
+                    }
+                  >
+                    Rouvrir l&apos;approbation
+                  </Button>
                   {error && <Text tone="critical">Erreur: {error}</Text>}
                 </BlockStack>
               </Card>
