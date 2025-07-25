@@ -12,6 +12,8 @@ import {
   Button,
   BlockStack,
   Text,
+  InlineStack,
+  Box,
 } from "@shopify/polaris";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
@@ -70,15 +72,36 @@ export default function App() {
         <Page>
           <Layout>
             <Layout.Section>
-              <Card>
-                <BlockStack gap="200">
-                  <Text>Merci d&apos;approuver l&apos;abonnement pour utiliser l&apos;app.</Text>
-                  <Button onClick={redirectToBilling}>
-                    Ouvrir l&apos;approbation
-                  </Button>
-                  {error && <Text tone="critical">Erreur: {error}</Text>}
-                </BlockStack>
-              </Card>
+              <Box paddingBlockStart="800" paddingBlockEnd="800">
+                <InlineStack gap="600" align="center" blockAlign="center">
+                  <Card>
+                    <Box padding="600">
+                      <BlockStack gap="400" align="center">
+                        <Text as="h2" variant="headingLg" alignment="center">
+                          Abonnement requis
+                        </Text>
+                        <Text as="p" variant="bodyMd" alignment="center" tone="subdued">
+                          Merci d'approuver l'abonnement pour utiliser l'app et accéder à toutes les fonctionnalités.
+                        </Text>
+                        <Box paddingBlockStart="200">
+                          <Button 
+                            onClick={redirectToBilling}
+                            variant="primary"
+                            size="large"
+                          >
+                            Ouvrir l'approbation
+                          </Button>
+                        </Box>
+                        {error && (
+                          <Text as="p" tone="critical" alignment="center">
+                            Erreur: {error}
+                          </Text>
+                        )}
+                      </BlockStack>
+                    </Box>
+                  </Card>
+                </InlineStack>
+              </Box>
             </Layout.Section>
           </Layout>
         </Page>
