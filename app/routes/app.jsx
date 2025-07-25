@@ -43,19 +43,10 @@ export default function App() {
 
   const redirectToBilling = useCallback(() => {
     if (!confirmationUrl) return;
-
-    try {
-      const redirect = Redirect.create(app);
-      // Vérifier que dispatch existe et est une fonction
-      if (redirect && typeof redirect.dispatch === 'function') {
-        redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-      } else {
-        console.error('App Bridge dispatch not available');
-      }
-    } catch (error) {
-      console.error('App Bridge redirect failed:', error);
-    }
-  }, [app, confirmationUrl]);
+    
+    // Ouvrir directement dans un nouvel onglet
+    window.open(confirmationUrl, '_blank', 'noopener,noreferrer');
+  }, [confirmationUrl]);
 
   useEffect(() => {
     if (!confirmationUrl) return;
@@ -83,7 +74,7 @@ export default function App() {
                 <BlockStack gap="200">
                   <Text>Merci d&apos;approuver l&apos;abonnement pour utiliser l&apos;app.</Text>
                   <Button onClick={redirectToBilling}>
-                    Rouvrir l&apos;approbation
+                    Ouvrir l&apos;approbation
                   </Button>
                   <Text as="p">
                     <a
