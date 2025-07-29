@@ -114,7 +114,7 @@ export async function ensureActiveSubscription(admin, shop) {
   }
 
   try {
-    const returnUrl = `${(process.env.SHOPIFY_APP_URL || "").replace(/\/$/, "")}/app`;
+    const returnUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
     const result = await admin.graphql(
         `mutation createSub($returnUrl: URL!) {
           appSubscriptionCreate(

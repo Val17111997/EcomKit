@@ -59,12 +59,21 @@ export const action = async ({ request }) => {
           break;
         case "APP_SUBSCRIPTIONS_UPDATE":
           try {
-            const subscriptionStatus = payload.app_subscription.status;
-            const subscriptionId = payload.app_subscription.id;
+            const subscription = payload.app_subscription || {};
+            const subscriptionStatus = subscription.status;
+            const subscriptionId =
+              subscription.admin_graphql_api_id || subscription.id;
 
-            console.log(`[WEBHOOK] Abonnement ${subscriptionId} -> ${subscriptionStatus}`);
+            console.log(
+              `[WEBHOOK] Abonnement ${subscriptionId} -> ${subscriptionStatus}`
+            );
 
-            if (subscriptionStatus === "CANCELLED" || subscriptionStatus === "EXPIRED") {
+            if (!subscriptionId) break;
+
+            if (
+              subscriptionStatus === "CANCELLED" ||
+              subscriptionStatus === "EXPIRED"
+            ) {
               await db.usageSubscription.updateMany({
                 where: { subscriptionId },
                 data: { status: "CANCELLED", confirmationUrl: null },
