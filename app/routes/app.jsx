@@ -30,7 +30,8 @@ export const loader = async ({ request }) => {
       where: { shop: shopParam },
       data: { status: "ACTIVE" },
     });
-    return redirect(`/app?shop=${shopParam}`);
+    const adminUrl = `https://${shopParam}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
+    return redirect(adminUrl);
   }
 
   // Authenticate with Shopify credentials to handle server-side queries
