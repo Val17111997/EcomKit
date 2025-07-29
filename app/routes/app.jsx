@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback } from "react";
 import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
@@ -20,19 +20,6 @@ import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const chargeId = url.searchParams.get("charge_id");
-  const shopParam = url.searchParams.get("shop");
-
-  if (chargeId && shopParam) {
-    const prisma = (await import("../db.server")).default;
-    await prisma.usageSubscription.updateMany({
-      where: { shop: shopParam },
-      data: { status: "ACTIVE" },
-    });
-    const adminUrl = `https://${shopParam}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
-    return redirect(adminUrl);
-  }
 
   // Authenticate with Shopify credentials to handle server-side queries
   const { authenticate } = await import("../shopify.server");
