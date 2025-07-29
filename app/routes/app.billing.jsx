@@ -13,7 +13,9 @@ export const loader = async ({ request }) => {
   }
   const { shop } = session;
 
-  const usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+  const usage = await prisma.usageSubscription.findFirst({
+    where: { shop, status: "ACTIVE" },
+  });
   if (!usage) {
     return json({ hasSubscription: false });
   }

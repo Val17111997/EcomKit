@@ -30,14 +30,14 @@ export const action = async ({ request }) => {
   
         case "ORDERS_CREATE":
           try {
-            let usageSubscription = await db.usageSubscription.findUnique({
-              where: { shop },
+            let usageSubscription = await db.usageSubscription.findFirst({
+              where: { shop, status: "ACTIVE" },
             });
 
             if (!usageSubscription) {
               await ensureActiveSubscription(admin, shop);
-              usageSubscription = await db.usageSubscription.findUnique({
-                where: { shop },
+              usageSubscription = await db.usageSubscription.findFirst({
+                where: { shop, status: "ACTIVE" },
               });
             }
 
@@ -61,28 +61,25 @@ export const action = async ({ request }) => {
           try {
             const subscriptionStatus = payload.app_subscription.status;
             const subscriptionId = payload.app_subscription.id;
-            
+
             console.log(`[WEBHOOK] Abonnement ${subscriptionId} -> ${subscriptionStatus}`);
-            
-            // Ici vous pouvez mettre à jour votre base de données si nécessaire
-            // Par exemple, désactiver des fonctionnalités si l'abonnement est annulé
-            
+
             if (subscriptionStatus === "CANCELLED" || subscriptionStatus === "EXPIRED") {
-              console.log(`[WEBHOOK] Abonnement ${subscriptionStatus} - fonctionnalités à désactiver`);
-              // TODO: Désactiver les fonctionnalités de l'app pour ce shop
+              await db.usageSubscription.updateMany({
+                where: { subscriptionId },
+                data: { status: "CANCELLED", confirmationUrl: null },
+              });
             } else if (subscriptionStatus === "ACTIVE") {
-              console.log(`[WEBHOOK] Abonnement ACTIF - fonctionnalités activées`);
-              try {
-                await db.usageSubscription.update({
-                  where: { shop },
-                  data: { confirmationUrl: null },
-                });
-              } catch (err) {
-                console.error(`[WEBHOOK] Erreur mise à jour confirmationUrl: ${err.message}`);
-              }
-              // TODO: Activer les fonctionnalités de l'app pour ce shop
+              await db.usageSubscription.updateMany({
+                where: { subscriptionId },
+                data: { status: "ACTIVE", confirmationUrl: null },
+              });
+              await db.usageSubscription.updateMany({
+                where: { shop, subscriptionId: { not: subscriptionId } },
+                data: { status: "CANCELLED", confirmationUrl: null },
+              });
             }
-            
+
           } catch (error) {
             console.error(`[WEBHOOK] Erreur traitement abonnement: ${error.message}`);
           }

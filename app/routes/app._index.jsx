@@ -32,7 +32,9 @@ export const loader = async ({ request }) => {
 
     let usage;
     try {
-      usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+      usage = await prisma.usageSubscription.findFirst({
+        where: { shop, status: "ACTIVE" },
+      });
     } catch (dbErr) {
       console.error("DB lookup failed:", dbErr);
     }
@@ -44,7 +46,9 @@ export const loader = async ({ request }) => {
 
     // Refresh usage in case a new subscription was created
     try {
-      usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+      usage = await prisma.usageSubscription.findFirst({
+        where: { shop, status: "ACTIVE" },
+      });
     } catch (dbErr) {
       console.error("DB lookup failed:", dbErr);
     }

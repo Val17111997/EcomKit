@@ -33,11 +33,14 @@ model Session {
 
 model UsageSubscription {
   id             Int      @id @default(autoincrement())
-  shop           String   @unique
-  subscriptionId String
+  shop           String
+  subscriptionId String   @unique
   lineItemId     String
+  status         String   @default("PENDING")
   orderCount     Int      @default(0)
   cycleStart     DateTime
   confirmationUrl String?
+
+  @@index([shop])
 }
 

@@ -3,7 +3,11 @@ import prisma from "./db.server";
 export async function processMonthlyUsage(admin, shop, existingUsage) {
   let usage = existingUsage;
   if (!usage) {
-    usage = await prisma.usageSubscription.findUnique({ where: { shop } });
+    usage = await prisma.usageSubscription.findFirst({
+      where: { shop, status: "ACTIVE" },
+    });
+  } else {
+    usage = await prisma.usageSubscription.findUnique({ where: { id: usage.id } });
   }
   if (!usage) return null;
 
@@ -48,30 +52,33 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   }
 
   return await prisma.usageSubscription.update({
-    where: { shop },
+    where: { id: usage.id },
     data: { orderCount: 0, cycleStart: now },
   });
 }
 
 // Check if the shop has an active subscription. If not, create a new one and return the confirmation URL.
 export async function ensureActiveSubscription(admin, shop) {
-  let usage;
-  try {
-    usage = await prisma.usageSubscription.findUnique({ where: { shop } });
-  } catch (err) {
-    console.error("DB lookup failed:", err);
+  const active = await prisma.usageSubscription.findFirst({
+    where: { shop, status: "ACTIVE" },
+  });
+
+  if (active && !active.confirmationUrl) {
+    await processMonthlyUsage(admin, shop, active);
+    return { active: true };
   }
 
-  if (usage) {
-    usage = await processMonthlyUsage(admin, shop, usage);
-  }
+  let pending = await prisma.usageSubscription.findFirst({
+    where: { shop, status: "PENDING" },
+    orderBy: { id: "desc" },
+  });
 
   let subscriptionStatus = null;
-  if (usage) {
+  if (pending) {
     try {
       const check = await admin.graphql(
         `query($id: ID!) { node(id: $id) { ... on AppSubscription { status } } }`,
-        { variables: { id: usage.subscriptionId } }
+        { variables: { id: pending.subscriptionId } }
       );
       const checkJson = await check.json();
       subscriptionStatus = checkJson?.data?.node?.status;
@@ -80,14 +87,35 @@ export async function ensureActiveSubscription(admin, shop) {
     }
   }
 
-  if (!usage || subscriptionStatus !== "ACTIVE") {
-    if (usage && subscriptionStatus === "PENDING" && usage.confirmationUrl) {
-      return { confirmationUrl: usage.confirmationUrl };
-    }
+  if (pending && subscriptionStatus === "ACTIVE") {
+    await prisma.usageSubscription.update({
+      where: { id: pending.id },
+      data: { status: "ACTIVE", confirmationUrl: null },
+    });
+    await prisma.usageSubscription.updateMany({
+      where: { shop, id: { not: pending.id } },
+      data: { status: "CANCELLED", confirmationUrl: null },
+    });
+    await processMonthlyUsage(admin, shop, pending);
+    return { active: true };
+  }
 
-    try {
-      const returnUrl = `${process.env.SHOPIFY_APP_URL}/app`;
-      const result = await admin.graphql(
+  if (pending && subscriptionStatus === "PENDING") {
+    if (pending.confirmationUrl) {
+      return { confirmationUrl: pending.confirmationUrl };
+    }
+  }
+
+  if (pending) {
+    await prisma.usageSubscription.update({
+      where: { id: pending.id },
+      data: { status: "CANCELLED", confirmationUrl: null },
+    });
+  }
+
+  try {
+    const returnUrl = `${(process.env.SHOPIFY_APP_URL || "").replace(/\/$/, "")}/app`;
+    const result = await admin.graphql(
         `mutation createSub($returnUrl: URL!) {
           appSubscriptionCreate(
             name: "Abonnement commandes mensuelles",
@@ -106,41 +134,26 @@ export async function ensureActiveSubscription(admin, shop) {
         { variables: { returnUrl } }
       );
 
-      const data = await result.json();
-      const payload = data.data.appSubscriptionCreate;
-      if (payload.userErrors?.length) {
-        return { error: payload.userErrors.map((e) => e.message).join(", ") };
-      }
-
-      if (usage) {
-        await prisma.usageSubscription.update({
-          where: { shop },
-          data: {
-            subscriptionId: payload.appSubscription.id,
-            lineItemId: payload.appSubscription.lineItems[0].id,
-            confirmationUrl: payload.confirmationUrl,
-            orderCount: 0,
-            cycleStart: new Date(),
-          },
-        });
-      } else {
-        await prisma.usageSubscription.create({
-          data: {
-            shop,
-            subscriptionId: payload.appSubscription.id,
-            lineItemId: payload.appSubscription.lineItems[0].id,
-            confirmationUrl: payload.confirmationUrl,
-            cycleStart: new Date(),
-          },
-        });
-      }
-
-      return { confirmationUrl: payload.confirmationUrl };
-    } catch (createErr) {
-      console.error("Erreur création abonnement:", createErr);
-      return { error: "Impossible de créer l'abonnement." };
+    const data = await result.json();
+    const payload = data.data.appSubscriptionCreate;
+    if (payload.userErrors?.length) {
+      return { error: payload.userErrors.map((e) => e.message).join(", ") };
     }
-  }
 
-  return { active: true };
+    await prisma.usageSubscription.create({
+      data: {
+        shop,
+        subscriptionId: payload.appSubscription.id,
+        lineItemId: payload.appSubscription.lineItems[0].id,
+        status: "PENDING",
+        confirmationUrl: payload.confirmationUrl,
+        cycleStart: new Date(),
+      },
+    });
+
+    return { confirmationUrl: payload.confirmationUrl };
+  } catch (createErr) {
+    console.error("Erreur création abonnement:", createErr);
+    return { error: "Impossible de créer l'abonnement." };
+  }
 }
