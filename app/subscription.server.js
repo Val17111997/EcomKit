@@ -136,10 +136,12 @@ export async function ensureActiveSubscription(admin, shop) {
 
     const data = await result.json();
     const payload = data.data.appSubscriptionCreate;
+    console.log("[SUBSCRIPTION] Payload retour mutation:", payload);
     if (payload.userErrors?.length) {
       return { error: payload.userErrors.map((e) => e.message).join(", ") };
     }
 
+    console.log("[SUBSCRIPTION] Avant creation en base");
     await prisma.usageSubscription.create({
       data: {
         shop,
@@ -150,6 +152,7 @@ export async function ensureActiveSubscription(admin, shop) {
         cycleStart: new Date(),
       },
     });
+    console.log("[SUBSCRIPTION] Apres creation en base");
 
     return { confirmationUrl: payload.confirmationUrl };
   } catch (createErr) {
