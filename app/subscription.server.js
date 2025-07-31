@@ -59,6 +59,62 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
 
 // Check if the shop has an active subscription. If not, create a new one and return the confirmation URL.
 export async function ensureActiveSubscription(admin, shop) {
+  // 1. CHECK LIVE CÔTÉ SHOPIFY EN PREMIER (correction du bug de boucle)
+  try {
+    const res = await admin.graphql(`
+      query {
+        currentAppInstallation {
+          activeSubscriptions {
+            id
+            status
+            lineItems { id }
+          }
+        }
+      }
+    `);
+    const json = await res.json();
+    const activeShopify = json?.data?.currentAppInstallation?.activeSubscriptions?.find(
+      sub => sub.status === "ACTIVE"
+    );
+    
+    if (activeShopify) {
+      console.log("[SUBSCRIPTION] Abonnement actif trouvé côté Shopify, synchronisation de la base");
+      // Synchronise la base de données avec Shopify
+      await prisma.usageSubscription.upsert({
+        where: { subscriptionId: activeShopify.id },
+        update: {
+          status: "ACTIVE",
+          confirmationUrl: null,
+          lineItemId: activeShopify.lineItems[0].id,
+        },
+        create: {
+          shop,
+          subscriptionId: activeShopify.id,
+          lineItemId: activeShopify.lineItems[0].id,
+          status: "ACTIVE",
+          confirmationUrl: null,
+          cycleStart: new Date(),
+        }
+      });
+      
+      // Annule tous les autres abonnements pour ce shop
+      await prisma.usageSubscription.updateMany({
+        where: { 
+          shop, 
+          subscriptionId: { not: activeShopify.id }
+        },
+        data: { status: "CANCELLED", confirmationUrl: null },
+      });
+      
+      await processMonthlyUsage(admin, shop, { ...activeShopify, shop });
+      return { active: true };
+    }
+  } catch (err) {
+    console.error("Erreur check live subscription Shopify:", err);
+    // Continue avec la logique basée sur la DB en cas d'erreur
+  }
+
+  // 2. Check en base locale (logique existante)
   const active = await prisma.usageSubscription.findFirst({
     where: { shop, status: "ACTIVE" },
   });
@@ -68,6 +124,7 @@ export async function ensureActiveSubscription(admin, shop) {
     return { active: true };
   }
 
+  // 3. Gestion des abonnements PENDING
   let pending = await prisma.usageSubscription.findFirst({
     where: { shop, status: "PENDING" },
     orderBy: { id: "desc" },
@@ -106,6 +163,7 @@ export async function ensureActiveSubscription(admin, shop) {
     }
   }
 
+  // 4. Nettoyage des abonnements obsolètes
   if (pending) {
     await prisma.usageSubscription.update({
       where: { id: pending.id },
@@ -113,6 +171,7 @@ export async function ensureActiveSubscription(admin, shop) {
     });
   }
 
+  // 5. Création d'un nouvel abonnement
   try {
     const returnUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
     const result = await admin.graphql(
@@ -137,6 +196,7 @@ export async function ensureActiveSubscription(admin, shop) {
     const data = await result.json();
     const payload = data.data.appSubscriptionCreate;
     console.log("[SUBSCRIPTION] Payload retour mutation:", payload);
+    
     if (payload.userErrors?.length) {
       return { error: payload.userErrors.map((e) => e.message).join(", ") };
     }
