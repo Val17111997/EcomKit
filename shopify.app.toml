@@ -13,6 +13,21 @@ automatically_update_urls_on_dev = true
 [webhooks]
 api_version = "2025-04"
 
+[webhooks.app_uninstalled]
+topic = "APP_UNINSTALLED"
+path = "/webhooks"
+delivery_method = "http"
+
+[webhooks.app_subscriptions_update]
+topic = "APP_SUBSCRIPTIONS_UPDATE"
+path = "/webhooks"
+delivery_method = "http"
+
+[webhooks.orders_create]
+topic = "ORDERS_CREATE"
+path = "/webhooks"
+delivery_method = "http"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "write_products,read_products,read_orders,read_customers,write_payment_terms"

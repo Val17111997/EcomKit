@@ -233,6 +233,17 @@ Instead of using the `afterAuth` hook, the recommended approach is to declare ap
 1. [app-specific vs shop-specific webhooks](https://shopify.dev/docs/apps/build/webhooks/subscribe#app-specific-subscriptions)
 2. [Create a subscription tutorial](https://shopify.dev/docs/apps/build/webhooks/subscribe/get-started?framework=remix&deliveryMethod=https)
 
+For example, to track every new order you can declare the `ORDERS_CREATE` webhook directly in `shopify.app.toml`:
+
+```toml
+[webhooks.orders_create]
+topic = "ORDERS_CREATE"
+path = "/webhooks"
+delivery_method = "http"
+```
+
+After editing the file, redeploy the app so Shopify updates the subscriptions.
+
 If you do need shop-specific webhooks, please keep in mind that the package calls `afterAuth` in 2 scenarios:
 
 - After installing the app
