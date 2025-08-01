@@ -1,5 +1,13 @@
 import prisma from "./db.server";
 
+// IMPORTANT: Assure-toi que ton schema.prisma a :
+// model UsageSubscription {
+//   id String @id @default(cuid())
+//   subscriptionId String @unique
+//   // ... autres champs
+// }
+// Puis lance: prisma migrate deploy
+
 export async function processMonthlyUsage(admin, shop, existingUsage) {
   let usage = existingUsage;
   if (!usage) {
@@ -20,9 +28,13 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
 
   let orderCount = 0;
   try {
+    // Utilise query string directement pour éviter les variables non utilisées
+    const startDate = startOfMonth.toISOString().split('T')[0];
+    const endDate = endOfMonth.toISOString().split('T')[0];
+    
     const response = await admin.graphql(`
-      query ($start: DateTime, $end: DateTime) {
-        orders(first: 250, query: "created_at:>=$start created_at:<=$end") {
+      query {
+        orders(first: 250, query: "created_at:>=${startDate} created_at:<=${endDate}") {
           edges {
             node {
               id
@@ -34,26 +46,29 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
           }
         }
       }
-    `, {
-      variables: {
-        start: startOfMonth.toISOString(),
-        end: endOfMonth.toISOString()
-      }
-    });
+    `);
 
-    // Parse la réponse (attention à la structure)
+    // Debug: loggue la réponse pour voir la structure
     const json = await response.json();
-    let edges = json?.data?.orders?.edges ?? [];
+    console.log("[DEBUG] Réponse GraphQL orders:", JSON.stringify(json, null, 2));
+    
+    // Vérification robuste de la structure
+    if (!json || !json.data || !json.data.orders) {
+      console.error("Structure de réponse inattendue:", json);
+      return usage; // Fallback sans compter
+    }
+    
+    let edges = json.data.orders.edges || [];
     orderCount = edges.length;
 
-    // Pagination possible (si + de 250 commandes, pas fréquent sur 1 mois)
-    let hasNextPage = json?.data?.orders?.pageInfo?.hasNextPage;
+    // Pagination si nécessaire
+    let hasNextPage = json.data.orders.pageInfo?.hasNextPage;
     let lastCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
 
     while (hasNextPage && lastCursor) {
       const resp = await admin.graphql(`
-        query ($start: DateTime, $end: DateTime, $after: String) {
-          orders(first: 250, after: $after, query: "created_at:>=$start created_at:<=$end") {
+        query {
+          orders(first: 250, after: "${lastCursor}", query: "created_at:>=${startDate} created_at:<=${endDate}") {
             edges {
               node {
                 id
@@ -65,22 +80,27 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
             }
           }
         }
-      `, {
-        variables: {
-          start: startOfMonth.toISOString(),
-          end: endOfMonth.toISOString(),
-          after: lastCursor
-        }
-      });
+      `);
 
       const nextJson = await resp.json();
-      const nextEdges = nextJson?.data?.orders?.edges ?? [];
+      
+      if (!nextJson || !nextJson.data || !nextJson.data.orders) {
+        console.error("Erreur pagination:", nextJson);
+        break;
+      }
+      
+      const nextEdges = nextJson.data.orders.edges || [];
       orderCount += nextEdges.length;
-      hasNextPage = nextJson?.data?.orders?.pageInfo?.hasNextPage;
+      hasNextPage = nextJson.data.orders.pageInfo?.hasNextPage;
       lastCursor = nextEdges.length > 0 ? nextEdges[nextEdges.length - 1].cursor : null;
     }
+    
+    console.log(`[USAGE] Commandes trouvées pour ${shop}: ${orderCount} (${startDate} à ${endDate})`);
+    
   } catch (e) {
     console.error("Erreur lors du comptage des commandes Shopify :", e);
+    console.error("Stack trace complet:", e.stack);
+    // En cas d'erreur, on continue avec orderCount = 0
   }
 
   const cycle = new Date(usage.cycleStart);
