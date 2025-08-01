@@ -21,16 +21,67 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   let orderCount = 0;
   
   try {
-    // Récupère l'access token correctement selon la structure Shopify
-    const accessToken = admin.session?.accessToken || admin.accessToken || admin.session?.token;
+    // Debug complet de la structure admin
+    console.log(`[DEBUG] Type admin:`, typeof admin);
+    console.log(`[DEBUG] Admin keys:`, Object.keys(admin || {}));
+    console.log(`[DEBUG] Admin.session exists:`, !!admin.session);
+    if (admin.session) {
+      console.log(`[DEBUG] Session keys:`, Object.keys(admin.session || {}));
+      console.log(`[DEBUG] Session.accessToken exists:`, !!admin.session.accessToken);
+    }
+    
+    // Essaie différentes façons d'accéder à l'access token
+    const accessToken = admin.session?.accessToken || 
+                       admin.accessToken || 
+                       admin.session?.token ||
+                       admin.token;
     
     if (!accessToken) {
-      throw new Error("Access token non disponible");
+      // Si pas d'access token, essaie d'utiliser l'admin directement avec GraphQL
+      console.log(`[DEBUG] Pas d'access token, essai GraphQL direct...`);
+      
+      const response = await admin.graphql(`
+        query {
+          shop {
+            name
+            id
+          }
+        }
+      `);
+      
+      const json = await response.json();
+      if (json?.data?.shop) {
+        console.log(`[DEBUG] GraphQL fonctionne, shop: ${json.data.shop.name}`);
+        
+        // Essaie de compter via GraphQL (sans données protégées)
+        const countResponse = await admin.graphql(`
+          query {
+            orders(first: 1) {
+              edges {
+                node {
+                  id
+                }
+              }
+            }
+          }
+        `);
+        
+        const countJson = await countResponse.json();
+        if (countJson?.data?.orders) {
+          console.log(`[DEBUG] Accès GraphQL orders possible !`);
+          // Si ça marche, on peut compter avec GraphQL
+          throw new Error("GraphQL orders accessible mais besoin de pagination");
+        } else {
+          throw new Error("GraphQL orders bloqué - données protégées");
+        }
+      } else {
+        throw new Error("GraphQL ne fonctionne pas du tout");
+      }
     }
     
     console.log(`[DEBUG] Access token trouvé, longueur: ${accessToken.length}`);
     
-    // Utilise l'API REST count (plus simple et souvent accessible)
+    // Utilise l'API REST count
     const countResponse = await fetch(
       `https://${shop}/admin/api/2025-01/orders/count.json?status=any&created_at_min=${startOfMonth.toISOString()}&created_at_max=${endOfMonth.toISOString()}`,
       {
