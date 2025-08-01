@@ -11,8 +11,34 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   }
   if (!usage) return null;
 
+  // Compte les commandes Shopify pour le mois courant
   const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59));
+
+  let orderCount = 0;
+  try {
+    let params = {
+      session: admin.session,
+      status: "any",
+      created_at_min: startOfMonth.toISOString(),
+      created_at_max: endOfMonth.toISOString(),
+      limit: 250,
+    };
+    
+    while (true) {
+      const res = await admin.rest.resources.Order.all(params);
+      orderCount += res.data.length;
+      
+      if (!res.nextPageParameters) break;
+      params = { ...params, ...res.nextPageParameters };
+    }
+  } catch (e) {
+    console.error("Erreur lors du comptage des commandes Shopify :", e);
+  }
+
   const cycle = new Date(usage.cycleStart);
+  // Si déjà facturé ce mois-ci, on skippe
   if (
     cycle.getUTCFullYear() === now.getUTCFullYear() &&
     cycle.getUTCMonth() === now.getUTCMonth()
@@ -21,8 +47,8 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   }
 
   let amount = 0;
-  if (usage.orderCount > 300) amount = 39.9;
-  else if (usage.orderCount > 30) amount = 19.9;
+  if (orderCount > 300) amount = 39.9;
+  else if (orderCount > 30) amount = 19.9;
 
   if (amount > 0) {
     try {
@@ -51,9 +77,10 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
     }
   }
 
+  // Mets à jour la base uniquement pour garder une trace (optionnel)
   return await prisma.usageSubscription.update({
     where: { id: usage.id },
-    data: { orderCount: 0, cycleStart: now },
+    data: { orderCount, cycleStart: now },
   });
 }
 
@@ -79,23 +106,35 @@ export async function ensureActiveSubscription(admin, shop) {
     
     if (activeShopify) {
       console.log("[SUBSCRIPTION] Abonnement actif trouvé côté Shopify, synchronisation de la base");
-      // Synchronise la base de données avec Shopify
-      await prisma.usageSubscription.upsert({
-        where: { subscriptionId: activeShopify.id },
-        update: {
-          status: "ACTIVE",
-          confirmationUrl: null,
-          lineItemId: activeShopify.lineItems[0].id,
-        },
-        create: {
+      // Cherche d'abord s'il existe déjà un enregistrement pour ce shop avec cet abonnement
+      const existing = await prisma.usageSubscription.findFirst({
+        where: { 
           shop,
-          subscriptionId: activeShopify.id,
-          lineItemId: activeShopify.lineItems[0].id,
-          status: "ACTIVE",
-          confirmationUrl: null,
-          cycleStart: new Date(),
+          subscriptionId: activeShopify.id 
         }
       });
+
+      if (existing) {
+        await prisma.usageSubscription.update({
+          where: { id: existing.id },
+          data: {
+            status: "ACTIVE",
+            confirmationUrl: null,
+            lineItemId: activeShopify.lineItems[0].id,
+          }
+        });
+      } else {
+        await prisma.usageSubscription.create({
+          data: {
+            shop,
+            subscriptionId: activeShopify.id,
+            lineItemId: activeShopify.lineItems[0].id,
+            status: "ACTIVE",
+            confirmationUrl: null,
+            cycleStart: new Date(),
+          }
+        });
+      }
       
       // Annule tous les autres abonnements pour ce shop
       await prisma.usageSubscription.updateMany({

@@ -28,10 +28,10 @@ const shopify = shopifyApp({
       deliveryMethod: DeliveryMethod.Http,
       callbackUrl: "/webhooks",
     },
-    ORDERS_CREATE: {
-      deliveryMethod: DeliveryMethod.Http,
-      callbackUrl: "/webhooks",
-    },
+    // ORDERS_CREATE: {
+    //   deliveryMethod: DeliveryMethod.Http,
+    //   callbackUrl: "/webhooks",
+    // }, // Temporairement désactivé en attendant l'approbation des données protégées
   },
   hooks: {
     afterAuth: async ({ session }) => {
