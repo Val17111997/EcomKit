@@ -1,13 +1,5 @@
 import prisma from "./db.server";
 
-// IMPORTANT: Assure-toi que ton schema.prisma a :
-// model UsageSubscription {
-//   id String @id @default(cuid())
-//   subscriptionId String @unique
-//   // ... autres champs
-// }
-// Puis lance: prisma migrate deploy
-
 export async function processMonthlyUsage(admin, shop, existingUsage) {
   let usage = existingUsage;
   if (!usage) {
@@ -27,80 +19,52 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59));
 
   let orderCount = 0;
+  
   try {
-    // Utilise query string directement pour éviter les variables non utilisées
-    const startDate = startOfMonth.toISOString().split('T')[0];
-    const endDate = endOfMonth.toISOString().split('T')[0];
-    
+    // Utilise l'API Analytics au lieu de Orders (pas de données protégées)
     const response = await admin.graphql(`
       query {
-        orders(first: 250, query: "created_at:>=${startDate} created_at:<=${endDate}") {
-          edges {
-            node {
-              id
-            }
-            cursor
-          }
-          pageInfo {
-            hasNextPage
+        shop {
+          analytics {
+            ordersTotalCount(period: MONTH)
           }
         }
       }
     `);
 
-    // Debug: loggue la réponse pour voir la structure
     const json = await response.json();
-    console.log("[DEBUG] Réponse GraphQL orders:", JSON.stringify(json, null, 2));
+    console.log("[DEBUG] Réponse Analytics:", JSON.stringify(json, null, 2));
     
-    // Vérification robuste de la structure
-    if (!json || !json.data || !json.data.orders) {
-      console.error("Structure de réponse inattendue:", json);
-      return usage; // Fallback sans compter
-    }
-    
-    let edges = json.data.orders.edges || [];
-    orderCount = edges.length;
-
-    // Pagination si nécessaire
-    let hasNextPage = json.data.orders.pageInfo?.hasNextPage;
-    let lastCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
-
-    while (hasNextPage && lastCursor) {
-      const resp = await admin.graphql(`
+    if (json?.data?.shop?.analytics?.ordersTotalCount) {
+      orderCount = json.data.shop.analytics.ordersTotalCount;
+      console.log(`[USAGE] Commandes du mois via Analytics: ${orderCount}`);
+    } else {
+      // Fallback: essayer avec les métriques de base
+      const metricsResponse = await admin.graphql(`
         query {
-          orders(first: 250, after: "${lastCursor}", query: "created_at:>=${startDate} created_at:<=${endDate}") {
-            edges {
-              node {
-                id
-              }
-              cursor
+          shop {
+            plan {
+              displayName
             }
-            pageInfo {
-              hasNextPage
-            }
+            myshopifyDomain
           }
         }
       `);
-
-      const nextJson = await resp.json();
       
-      if (!nextJson || !nextJson.data || !nextJson.data.orders) {
-        console.error("Erreur pagination:", nextJson);
-        break;
-      }
+      const metricsJson = await metricsResponse.json();
+      console.log("[DEBUG] Shop info récupérée, comptage manuel nécessaire");
       
-      const nextEdges = nextJson.data.orders.edges || [];
-      orderCount += nextEdges.length;
-      hasNextPage = nextJson.data.orders.pageInfo?.hasNextPage;
-      lastCursor = nextEdges.length > 0 ? nextEdges[nextEdges.length - 1].cursor : null;
+      // Si on ne peut pas accéder aux analytics, on utilise la valeur en base
+      orderCount = usage.orderCount || 0;
+      console.log(`[USAGE] Fallback sur la valeur en base: ${orderCount}`);
     }
     
-    console.log(`[USAGE] Commandes trouvées pour ${shop}: ${orderCount} (${startDate} à ${endDate})`);
-    
   } catch (e) {
-    console.error("Erreur lors du comptage des commandes Shopify :", e);
-    console.error("Stack trace complet:", e.stack);
-    // En cas d'erreur, on continue avec orderCount = 0
+    console.error("Erreur lors du comptage via Analytics :", e);
+    
+    // Dernier fallback : estimation basée sur les données existantes
+    orderCount = usage.orderCount || 0;
+    console.log(`[USAGE] Utilisation de la valeur en base: ${orderCount}`);
   }
 
   const cycle = new Date(usage.cycleStart);
@@ -145,7 +109,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
 
   // Mets à jour la base uniquement pour garder une trace (optionnel)
   return await prisma.usageSubscription.update({
-    where: { subscriptionId: usage.subscriptionId },
+    where: { id: usage.id }, // Utilise l'id auto-increment pour l'update
     data: { orderCount, cycleStart: now },
   });
 }
@@ -182,7 +146,7 @@ export async function ensureActiveSubscription(admin, shop) {
 
       if (existing) {
         await prisma.usageSubscription.update({
-          where: { subscriptionId: existing.subscriptionId },
+          where: { id: existing.id }, // Utilise l'id auto-increment
           data: {
             status: "ACTIVE",
             confirmationUrl: null,
@@ -251,11 +215,11 @@ export async function ensureActiveSubscription(admin, shop) {
 
   if (pending && subscriptionStatus === "ACTIVE") {
     await prisma.usageSubscription.update({
-      where: { subscriptionId: pending.subscriptionId },
+      where: { id: pending.id }, // Utilise l'id auto-increment
       data: { status: "ACTIVE", confirmationUrl: null },
     });
     await prisma.usageSubscription.updateMany({
-      where: { shop, subscriptionId: { not: pending.subscriptionId } },
+      where: { shop, id: { not: pending.id } }, // Utilise l'id auto-increment
       data: { status: "CANCELLED", confirmationUrl: null },
     });
     await processMonthlyUsage(admin, shop, pending);
@@ -271,7 +235,7 @@ export async function ensureActiveSubscription(admin, shop) {
   // 4. Nettoyage des abonnements obsolètes
   if (pending) {
     await prisma.usageSubscription.update({
-      where: { subscriptionId: pending.subscriptionId },
+      where: { id: pending.id }, // Utilise l'id auto-increment
       data: { status: "CANCELLED", confirmationUrl: null },
     });
   }
