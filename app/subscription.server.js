@@ -21,50 +21,79 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   let orderCount = 0;
   
   try {
-    // Utilise l'API Analytics au lieu de Orders (pas de données protégées)
-    const response = await admin.graphql(`
-      query {
-        shop {
-          analytics {
-            ordersTotalCount(period: MONTH)
-          }
-        }
+    // Utilise l'API REST count (plus simple et souvent accessible)
+    const countResponse = await fetch(
+      `https://${shop}/admin/api/2025-01/orders/count.json?status=any&created_at_min=${startOfMonth.toISOString()}&created_at_max=${endOfMonth.toISOString()}`,
+      {
+        headers: {
+          'X-Shopify-Access-Token': admin.session.accessToken,
+          'Content-Type': 'application/json',
+        },
       }
-    `);
+    );
 
-    const json = await response.json();
-    console.log("[DEBUG] Réponse Analytics:", JSON.stringify(json, null, 2));
-    
-    if (json?.data?.shop?.analytics?.ordersTotalCount) {
-      orderCount = json.data.shop.analytics.ordersTotalCount;
-      console.log(`[USAGE] Commandes du mois via Analytics: ${orderCount}`);
+    if (countResponse.ok) {
+      const countData = await countResponse.json();
+      orderCount = countData.count || 0;
+      console.log(`[USAGE] Commandes comptées via REST API: ${orderCount}`);
     } else {
-      // Fallback: essayer avec les métriques de base
-      const metricsResponse = await admin.graphql(`
+      throw new Error(`REST API failed: ${countResponse.status}`);
+    }
+    
+  } catch (restError) {
+    console.error("Erreur API REST count:", restError);
+    
+    try {
+      // Fallback: Essaie GraphQL avec une approche minimale
+      const response = await admin.graphql(`
         query {
-          shop {
-            plan {
-              displayName
+          orders(first: 1) {
+            edges {
+              node {
+                id
+              }
             }
-            myshopifyDomain
           }
         }
       `);
       
-      const metricsJson = await metricsResponse.json();
-      console.log("[DEBUG] Shop info récupérée, comptage manuel nécessaire");
+      const json = await response.json();
+      if (json?.data?.orders) {
+        // Si on arrive ici, l'accès aux orders fonctionne, on peut faire le vrai comptage
+        console.log("[USAGE] Accès GraphQL orders confirmé, comptage complet...");
+        
+        // Recommence avec le comptage complet
+        const fullResponse = await admin.graphql(`
+          query {
+            orders(first: 250, query: "created_at:>=${startOfMonth.toISOString().split('T')[0]} created_at:<=${endOfMonth.toISOString().split('T')[0]}") {
+              edges {
+                node {
+                  id
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        `);
+        
+        const fullJson = await fullResponse.json();
+        orderCount = fullJson?.data?.orders?.edges?.length || 0;
+        console.log(`[USAGE] Commandes comptées via GraphQL: ${orderCount}`);
+        
+      } else {
+        throw new Error("GraphQL orders aussi inaccessible");
+      }
       
-      // Si on ne peut pas accéder aux analytics, on utilise la valeur en base
+    } catch (graphqlError) {
+      console.error("Erreur GraphQL fallback:", graphqlError);
+      
+      // Dernier recours : valeur en base mais avec un avertissement
       orderCount = usage.orderCount || 0;
-      console.log(`[USAGE] Fallback sur la valeur en base: ${orderCount}`);
+      console.warn(`[USAGE] ATTENTION: Impossible de compter les commandes automatiquement. Utilisation de la valeur en base: ${orderCount}. Facturation potentiellement incorrecte !`);
     }
-    
-  } catch (e) {
-    console.error("Erreur lors du comptage via Analytics :", e);
-    
-    // Dernier fallback : estimation basée sur les données existantes
-    orderCount = usage.orderCount || 0;
-    console.log(`[USAGE] Utilisation de la valeur en base: ${orderCount}`);
   }
 
   const cycle = new Date(usage.cycleStart);
