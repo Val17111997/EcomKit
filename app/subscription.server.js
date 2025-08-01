@@ -21,79 +21,47 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   let orderCount = 0;
   
   try {
+    // Récupère l'access token correctement selon la structure Shopify
+    const accessToken = admin.session?.accessToken || admin.accessToken || admin.session?.token;
+    
+    if (!accessToken) {
+      throw new Error("Access token non disponible");
+    }
+    
+    console.log(`[DEBUG] Access token trouvé, longueur: ${accessToken.length}`);
+    
     // Utilise l'API REST count (plus simple et souvent accessible)
     const countResponse = await fetch(
       `https://${shop}/admin/api/2025-01/orders/count.json?status=any&created_at_min=${startOfMonth.toISOString()}&created_at_max=${endOfMonth.toISOString()}`,
       {
         headers: {
-          'X-Shopify-Access-Token': admin.session.accessToken,
+          'X-Shopify-Access-Token': accessToken,
           'Content-Type': 'application/json',
         },
       }
     );
 
+    console.log(`[DEBUG] REST API response status: ${countResponse.status}`);
+    
     if (countResponse.ok) {
       const countData = await countResponse.json();
       orderCount = countData.count || 0;
-      console.log(`[USAGE] Commandes comptées via REST API: ${orderCount}`);
+      console.log(`[USAGE] ✅ Commandes comptées via REST API: ${orderCount}`);
     } else {
-      throw new Error(`REST API failed: ${countResponse.status}`);
+      const errorText = await countResponse.text();
+      console.error(`[DEBUG] REST API error: ${countResponse.status} - ${errorText}`);
+      throw new Error(`REST API failed: ${countResponse.status} - ${errorText}`);
     }
     
   } catch (restError) {
-    console.error("Erreur API REST count:", restError);
+    console.error("Erreur API REST count:", restError.message);
     
-    try {
-      // Fallback: Essaie GraphQL avec une approche minimale
-      const response = await admin.graphql(`
-        query {
-          orders(first: 1) {
-            edges {
-              node {
-                id
-              }
-            }
-          }
-        }
-      `);
-      
-      const json = await response.json();
-      if (json?.data?.orders) {
-        // Si on arrive ici, l'accès aux orders fonctionne, on peut faire le vrai comptage
-        console.log("[USAGE] Accès GraphQL orders confirmé, comptage complet...");
-        
-        // Recommence avec le comptage complet
-        const fullResponse = await admin.graphql(`
-          query {
-            orders(first: 250, query: "created_at:>=${startOfMonth.toISOString().split('T')[0]} created_at:<=${endOfMonth.toISOString().split('T')[0]}") {
-              edges {
-                node {
-                  id
-                }
-              }
-              pageInfo {
-                hasNextPage
-                endCursor
-              }
-            }
-          }
-        `);
-        
-        const fullJson = await fullResponse.json();
-        orderCount = fullJson?.data?.orders?.edges?.length || 0;
-        console.log(`[USAGE] Commandes comptées via GraphQL: ${orderCount}`);
-        
-      } else {
-        throw new Error("GraphQL orders aussi inaccessible");
-      }
-      
-    } catch (graphqlError) {
-      console.error("Erreur GraphQL fallback:", graphqlError);
-      
-      // Dernier recours : valeur en base mais avec un avertissement
-      orderCount = usage.orderCount || 0;
-      console.warn(`[USAGE] ATTENTION: Impossible de compter les commandes automatiquement. Utilisation de la valeur en base: ${orderCount}. Facturation potentiellement incorrecte !`);
-    }
+    // Fallback ultime : valeur en base avec avertissement clair
+    orderCount = usage.orderCount || 0;
+    console.warn(`[USAGE] ⚠️  IMPOSSIBLE DE COMPTER LES COMMANDES AUTOMATIQUEMENT`);
+    console.warn(`[USAGE] ⚠️  Cause: ${restError.message}`);
+    console.warn(`[USAGE] ⚠️  Utilisation valeur en base: ${orderCount}`);
+    console.warn(`[USAGE] ⚠️  ACTION REQUISE: Vérifier les scopes (read_orders) ou demander approbation données protégées`);
   }
 
   const cycle = new Date(usage.cycleStart);
