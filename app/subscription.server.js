@@ -7,7 +7,9 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
       where: { shop, status: "ACTIVE" },
     });
   } else {
-    usage = await prisma.usageSubscription.findUnique({ where: { id: usage.id } });
+    usage = await prisma.usageSubscription.findFirst({ 
+      where: { subscriptionId: existingUsage.subscriptionId } 
+    });
   }
   if (!usage) return null;
 
@@ -18,20 +20,64 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
 
   let orderCount = 0;
   try {
-    let params = {
-      session: admin.session,
-      status: "any",
-      created_at_min: startOfMonth.toISOString(),
-      created_at_max: endOfMonth.toISOString(),
-      limit: 250,
-    };
-    
-    while (true) {
-      const res = await admin.rest.resources.Order.all(params);
-      orderCount += res.data.length;
-      
-      if (!res.nextPageParameters) break;
-      params = { ...params, ...res.nextPageParameters };
+    const response = await admin.graphql(`
+      query ($start: DateTime, $end: DateTime) {
+        orders(first: 250, query: "created_at:>=$start created_at:<=$end") {
+          edges {
+            node {
+              id
+            }
+            cursor
+          }
+          pageInfo {
+            hasNextPage
+          }
+        }
+      }
+    `, {
+      variables: {
+        start: startOfMonth.toISOString(),
+        end: endOfMonth.toISOString()
+      }
+    });
+
+    // Parse la réponse (attention à la structure)
+    const json = await response.json();
+    let edges = json?.data?.orders?.edges ?? [];
+    orderCount = edges.length;
+
+    // Pagination possible (si + de 250 commandes, pas fréquent sur 1 mois)
+    let hasNextPage = json?.data?.orders?.pageInfo?.hasNextPage;
+    let lastCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+
+    while (hasNextPage && lastCursor) {
+      const resp = await admin.graphql(`
+        query ($start: DateTime, $end: DateTime, $after: String) {
+          orders(first: 250, after: $after, query: "created_at:>=$start created_at:<=$end") {
+            edges {
+              node {
+                id
+              }
+              cursor
+            }
+            pageInfo {
+              hasNextPage
+            }
+          }
+        }
+      `, {
+        variables: {
+          start: startOfMonth.toISOString(),
+          end: endOfMonth.toISOString(),
+          after: lastCursor
+        }
+      });
+
+      const nextJson = await resp.json();
+      const nextEdges = nextJson?.data?.orders?.edges ?? [];
+      orderCount += nextEdges.length;
+      hasNextPage = nextJson?.data?.orders?.pageInfo?.hasNextPage;
+      lastCursor = nextEdges.length > 0 ? nextEdges[nextEdges.length - 1].cursor : null;
     }
   } catch (e) {
     console.error("Erreur lors du comptage des commandes Shopify :", e);
@@ -79,7 +125,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
 
   // Mets à jour la base uniquement pour garder une trace (optionnel)
   return await prisma.usageSubscription.update({
-    where: { id: usage.id },
+    where: { subscriptionId: usage.subscriptionId },
     data: { orderCount, cycleStart: now },
   });
 }
@@ -116,7 +162,7 @@ export async function ensureActiveSubscription(admin, shop) {
 
       if (existing) {
         await prisma.usageSubscription.update({
-          where: { id: existing.id },
+          where: { subscriptionId: existing.subscriptionId },
           data: {
             status: "ACTIVE",
             confirmationUrl: null,
@@ -185,11 +231,11 @@ export async function ensureActiveSubscription(admin, shop) {
 
   if (pending && subscriptionStatus === "ACTIVE") {
     await prisma.usageSubscription.update({
-      where: { id: pending.id },
+      where: { subscriptionId: pending.subscriptionId },
       data: { status: "ACTIVE", confirmationUrl: null },
     });
     await prisma.usageSubscription.updateMany({
-      where: { shop, id: { not: pending.id } },
+      where: { shop, subscriptionId: { not: pending.subscriptionId } },
       data: { status: "CANCELLED", confirmationUrl: null },
     });
     await processMonthlyUsage(admin, shop, pending);
@@ -205,7 +251,7 @@ export async function ensureActiveSubscription(admin, shop) {
   // 4. Nettoyage des abonnements obsolètes
   if (pending) {
     await prisma.usageSubscription.update({
-      where: { id: pending.id },
+      where: { subscriptionId: pending.subscriptionId },
       data: { status: "CANCELLED", confirmationUrl: null },
     });
   }
