@@ -21,98 +21,61 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   let orderCount = 0;
   
   try {
-    // Debug complet de la structure admin
-    console.log(`[DEBUG] Type admin:`, typeof admin);
-    console.log(`[DEBUG] Admin keys:`, Object.keys(admin || {}));
-    console.log(`[DEBUG] Admin.session exists:`, !!admin.session);
-    if (admin.session) {
-      console.log(`[DEBUG] Session keys:`, Object.keys(admin.session || {}));
-      console.log(`[DEBUG] Session.accessToken exists:`, !!admin.session.accessToken);
-    }
+    // APPROCHE HYBRIDE : Vérification anti-fraude
+    console.log(`[USAGE] 🔍 Mode vérification anti-fraude activé`);
     
-    // Essaie différentes façons d'accéder à l'access token
-    const accessToken = admin.session?.accessToken || 
-                       admin.accessToken || 
-                       admin.session?.token ||
-                       admin.token;
-    
-    if (!accessToken) {
-      // Si pas d'access token, essaie d'utiliser l'admin directement avec GraphQL
-      console.log(`[DEBUG] Pas d'access token, essai GraphQL direct...`);
-      
-      const response = await admin.graphql(`
-        query {
-          shop {
-            name
-            id
+    // 1. Essaie d'accéder aux métriques publiques pour validation
+    const shopResponse = await admin.graphql(`
+      query {
+        shop {
+          name
+          plan {
+            displayName
           }
+          createdAt
         }
-      `);
-      
-      const json = await response.json();
-      if (json?.data?.shop) {
-        console.log(`[DEBUG] GraphQL fonctionne, shop: ${json.data.shop.name}`);
-        
-        // Essaie de compter via GraphQL (sans données protégées)
-        const countResponse = await admin.graphql(`
-          query {
-            orders(first: 1) {
-              edges {
-                node {
-                  id
-                }
-              }
-            }
-          }
-        `);
-        
-        const countJson = await countResponse.json();
-        if (countJson?.data?.orders) {
-          console.log(`[DEBUG] Accès GraphQL orders possible !`);
-          // Si ça marche, on peut compter avec GraphQL
-          throw new Error("GraphQL orders accessible mais besoin de pagination");
-        } else {
-          throw new Error("GraphQL orders bloqué - données protégées");
-        }
-      } else {
-        throw new Error("GraphQL ne fonctionne pas du tout");
       }
-    }
+    `);
     
-    console.log(`[DEBUG] Access token trouvé, longueur: ${accessToken.length}`);
+    const shopJson = await shopResponse.json();
+    const shopAge = shopJson?.data?.shop?.createdAt ? 
+      Math.floor((Date.now() - new Date(shopJson.data.shop.createdAt)) / (1000 * 60 * 60 * 24)) : null;
     
-    // Utilise l'API REST count
-    const countResponse = await fetch(
-      `https://${shop}/admin/api/2025-01/orders/count.json?status=any&created_at_min=${startOfMonth.toISOString()}&created_at_max=${endOfMonth.toISOString()}`,
-      {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    console.log(`[DEBUG] REST API response status: ${countResponse.status}`);
+    console.log(`[DEBUG] Shop: ${shopJson?.data?.shop?.name}, Âge: ${shopAge} jours`);
     
-    if (countResponse.ok) {
-      const countData = await countResponse.json();
-      orderCount = countData.count || 0;
-      console.log(`[USAGE] ✅ Commandes comptées via REST API: ${orderCount}`);
+    // 2. Utilise la valeur en base MAIS avec des limites de sécurité
+    const declaredCount = usage.orderCount || 0;
+    
+    // 3. Vérifications de cohérence anti-fraude
+    const maxReasonableOrders = shopAge ? Math.min(shopAge * 2, 1000) : 100; // Max 2 commandes/jour
+    
+    if (declaredCount > maxReasonableOrders) {
+      console.warn(`[SECURITY] 🚨 Nombre suspect: ${declaredCount} > ${maxReasonableOrders} (max raisonnable)`);
+      orderCount = maxReasonableOrders; // Limite à un maximum raisonnable
+      console.warn(`[SECURITY] 🚨 Limitation appliquée à ${orderCount} commandes`);
     } else {
-      const errorText = await countResponse.text();
-      console.error(`[DEBUG] REST API error: ${countResponse.status} - ${errorText}`);
-      throw new Error(`REST API failed: ${countResponse.status} - ${errorText}`);
+      orderCount = declaredCount;
     }
     
-  } catch (restError) {
-    console.error("Erreur API REST count:", restError.message);
+    // 4. Message clair sur les limitations
+    console.log(`[USAGE] ⚠️  MODE TEMPORAIRE ACTIF :`);
+    console.log(`[USAGE] ⚠️  - Comptage basé sur déclaration: ${orderCount} commandes`);
+    console.log(`[USAGE] ⚠️  - Vérifications anti-fraude appliquées`);
+    console.log(`[USAGE] ⚠️  - SOLUTION PERMANENTE: Demander approbation données protégées`);
     
-    // Fallback ultime : valeur en base avec avertissement clair
-    orderCount = usage.orderCount || 0;
-    console.warn(`[USAGE] ⚠️  IMPOSSIBLE DE COMPTER LES COMMANDES AUTOMATIQUEMENT`);
-    console.warn(`[USAGE] ⚠️  Cause: ${restError.message}`);
-    console.warn(`[USAGE] ⚠️  Utilisation valeur en base: ${orderCount}`);
-    console.warn(`[USAGE] ⚠️  ACTION REQUISE: Vérifier les scopes (read_orders) ou demander approbation données protégées`);
+    // 5. Facturation avec limite de sécurité (évite les factures énormes en cas de fraude)
+    if (orderCount > 500) {
+      console.warn(`[SECURITY] 🚨 Limitation facturation: max 500 commandes (39,90€) en mode temporaire`);
+      orderCount = 500; // Limite la facturation maximum
+    }
+    
+  } catch (error) {
+    console.error("Erreur mode hybride:", error.message);
+    
+    // Valeur par défaut ultra-conservatrice
+    orderCount = Math.min(usage.orderCount || 0, 50); // Max 50 commandes en cas d'erreur
+    console.warn(`[USAGE] ⚠️  MODE SÉCURISÉ: Limitation à ${orderCount} commandes maximum`);
+    console.warn(`[USAGE] ⚠️  Pour une facturation correcte, demander l'approbation Shopify`);
   }
 
   const cycle = new Date(usage.cycleStart);
