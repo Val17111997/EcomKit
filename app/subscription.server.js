@@ -21,61 +21,93 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   let orderCount = 0;
   
   try {
-    // APPROCHE HYBRIDE : Vérification anti-fraude
-    console.log(`[USAGE] 🔍 Mode vérification anti-fraude activé`);
+    // COMPTAGE AUTOMATIQUE RÉEL avec approbation Shopify
+    console.log(`[USAGE] 🚀 Comptage automatique activé (approbation Shopify obtenue)`);
     
-    // 1. Essaie d'accéder aux métriques publiques pour validation
-    const shopResponse = await admin.graphql(`
+    // Compte les commandes du mois via GraphQL
+    const startDate = startOfMonth.toISOString().split('T')[0];
+    const endDate = endOfMonth.toISOString().split('T')[0];
+    
+    const response = await admin.graphql(`
       query {
-        shop {
-          name
-          plan {
-            displayName
+        orders(first: 250, query: "created_at:>=${startDate} created_at:<=${endDate}") {
+          edges {
+            node {
+              id
+              createdAt
+            }
+            cursor
           }
-          createdAt
+          pageInfo {
+            hasNextPage
+          }
         }
       }
     `);
+
+    const json = await response.json();
+    console.log(`[DEBUG] Réponse GraphQL orders reçue`);
     
-    const shopJson = await shopResponse.json();
-    const shopAge = shopJson?.data?.shop?.createdAt ? 
-      Math.floor((Date.now() - new Date(shopJson.data.shop.createdAt)) / (1000 * 60 * 60 * 24)) : null;
-    
-    console.log(`[DEBUG] Shop: ${shopJson?.data?.shop?.name}, Âge: ${shopAge} jours`);
-    
-    // 2. Utilise la valeur en base MAIS avec des limites de sécurité
-    const declaredCount = usage.orderCount || 0;
-    
-    // 3. Vérifications de cohérence anti-fraude
-    const maxReasonableOrders = shopAge ? Math.min(shopAge * 2, 1000) : 100; // Max 2 commandes/jour
-    
-    if (declaredCount > maxReasonableOrders) {
-      console.warn(`[SECURITY] 🚨 Nombre suspect: ${declaredCount} > ${maxReasonableOrders} (max raisonnable)`);
-      orderCount = maxReasonableOrders; // Limite à un maximum raisonnable
-      console.warn(`[SECURITY] 🚨 Limitation appliquée à ${orderCount} commandes`);
+    if (json?.data?.orders) {
+      const edges = json.data.orders.edges || [];
+      orderCount = edges.length;
+      console.log(`[USAGE] ✅ ${orderCount} commandes trouvées pour la période`);
+      
+      // Gestion de la pagination si plus de 250 commandes
+      let hasNextPage = json.data.orders.pageInfo?.hasNextPage;
+      let lastCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+      
+      while (hasNextPage && lastCursor) {
+        console.log(`[DEBUG] Pagination: récupération de la suite...`);
+        
+        const nextResponse = await admin.graphql(`
+          query {
+            orders(first: 250, after: "${lastCursor}", query: "created_at:>=${startDate} created_at:<=${endDate}") {
+              edges {
+                node {
+                  id
+                }
+                cursor
+              }
+              pageInfo {
+                hasNextPage
+              }
+            }
+          }
+        `);
+        
+        const nextJson = await nextResponse.json();
+        
+        if (nextJson?.data?.orders) {
+          const nextEdges = nextJson.data.orders.edges || [];
+          orderCount += nextEdges.length;
+          hasNextPage = nextJson.data.orders.pageInfo?.hasNextPage;
+          lastCursor = nextEdges.length > 0 ? nextEdges[nextEdges.length - 1].cursor : null;
+          console.log(`[DEBUG] +${nextEdges.length} commandes, total: ${orderCount}`);
+        } else {
+          console.log(`[DEBUG] Fin de pagination`);
+          break;
+        }
+      }
+      
+      console.log(`[USAGE] 🎯 TOTAL FINAL: ${orderCount} commandes pour ${startDate} à ${endDate}`);
+      
+    } else if (json?.errors) {
+      console.error(`[ERROR] Erreurs GraphQL:`, json.errors);
+      throw new Error(`GraphQL errors: ${json.errors.map(e => e.message).join(', ')}`);
     } else {
-      orderCount = declaredCount;
-    }
-    
-    // 4. Message clair sur les limitations
-    console.log(`[USAGE] ⚠️  MODE TEMPORAIRE ACTIF :`);
-    console.log(`[USAGE] ⚠️  - Comptage basé sur déclaration: ${orderCount} commandes`);
-    console.log(`[USAGE] ⚠️  - Vérifications anti-fraude appliquées`);
-    console.log(`[USAGE] ⚠️  - SOLUTION PERMANENTE: Demander approbation données protégées`);
-    
-    // 5. Facturation avec limite de sécurité (évite les factures énormes en cas de fraude)
-    if (orderCount > 500) {
-      console.warn(`[SECURITY] 🚨 Limitation facturation: max 500 commandes (39,90€) en mode temporaire`);
-      orderCount = 500; // Limite la facturation maximum
+      console.error(`[ERROR] Structure de réponse inattendue:`, JSON.stringify(json, null, 2));
+      throw new Error("Réponse GraphQL inattendue");
     }
     
   } catch (error) {
-    console.error("Erreur mode hybride:", error.message);
+    console.error("Erreur comptage automatique:", error.message);
     
-    // Valeur par défaut ultra-conservatrice
-    orderCount = Math.min(usage.orderCount || 0, 50); // Max 50 commandes en cas d'erreur
-    console.warn(`[USAGE] ⚠️  MODE SÉCURISÉ: Limitation à ${orderCount} commandes maximum`);
-    console.warn(`[USAGE] ⚠️  Pour une facturation correcte, demander l'approbation Shopify`);
+    // Fallback sur la valeur en base avec avertissement
+    orderCount = usage.orderCount || 0;
+    console.warn(`[USAGE] ⚠️  FALLBACK: Utilisation valeur en base: ${orderCount}`);
+    console.warn(`[USAGE] ⚠️  Cause: ${error.message}`);
+    console.warn(`[USAGE] ⚠️  Vérifiez que l'app a bien été réinstallée après approbation`);
   }
 
   const cycle = new Date(usage.cycleStart);
