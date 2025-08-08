@@ -38,7 +38,7 @@ model UsageSubscription {
   lineItemId     String
   status         String   @default("PENDING")
   orderCount     Int      @default(0)
-  cycleStart     DateTime
+  cycleStart     DateTime? 
   confirmationUrl String?
 
   @@index([shop])
