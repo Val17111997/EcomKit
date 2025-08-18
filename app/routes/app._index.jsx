@@ -40,33 +40,24 @@ export const loader = async ({ request }) => {
     }
 
     const billing = await ensureActiveSubscription(admin, shop);
-    if (billing.error) {
+    if (billing.confirmationUrl || billing.error) {
       return json(billing);
     }
 
     // Refresh usage in case a new subscription was created
-    if (!billing.confirmationUrl) {
-      try {
-        usage = await prisma.usageSubscription.findFirst({
-          where: { shop, status: "ACTIVE" },
-        });
-      } catch (dbErr) {
-        console.error("DB lookup failed:", dbErr);
-      }
+    try {
+      usage = await prisma.usageSubscription.findFirst({
+        where: { shop, status: "ACTIVE" },
+      });
+    } catch (dbErr) {
+      console.error("DB lookup failed:", dbErr);
     }
 
-    // CORRECTION ICI : Utiliser le orderCount du billing s'il existe
-    const count = billing?.orderCount ?? usage?.orderCount ?? 0;
-    
     let nextPrice = 0;
-    if (count > 300) nextPrice = 39.90;
-    else if (count > 30) nextPrice = 19.90;
+    if (usage && usage.orderCount > 300) nextPrice = 39.90;
+    else if (usage && usage.orderCount > 30) nextPrice = 19.90;
 
-    return json({ 
-      orderCount: count, 
-      nextPrice,
-      ...(billing?.confirmationUrl ? { confirmationUrl: billing.confirmationUrl } : {})
-    });
+    return json({ orderCount: usage?.orderCount ?? 0, nextPrice });
   } catch (error) {
     console.error("Erreur dans loader:", error);
     return json({ error: "Une erreur est survenue." });
