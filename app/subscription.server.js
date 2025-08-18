@@ -2,12 +2,6 @@ import prisma from "./db.server";
 
 export async function processMonthlyUsage(admin, shop, existingUsage) {
   let usage = existingUsage || await prisma.usageSubscription.findFirst({ where: { shop, status: "ACTIVE" } });
-  
-  // PATCH 2: Si usage ne vient pas de la DB (pas d'id numérique), on le recharge
-  if (!usage || typeof usage.id !== "number") {
-    usage = await prisma.usageSubscription.findFirst({ where: { shop, status: "ACTIVE" } });
-  }
-  
   if (!usage) return null;
 
   // Compte les commandes Shopify pour le mois courant
@@ -219,12 +213,7 @@ export async function ensureActiveSubscription(admin, shop) {
         data: { status: "CANCELLED", confirmationUrl: null },
       });
       
-      // PATCH 1: Récupère l'enregistrement DB (id numérique) et PAS l'objet Shopify
-      const dbUsage = await prisma.usageSubscription.findFirst({
-        where: { shop, subscriptionId: activeShopify.id },
-      });
-      
-      const res = await processMonthlyUsage(admin, shop, dbUsage);
+      const res = await processMonthlyUsage(admin, shop, { ...activeShopify, shop });
       return { active: true, orderCount: res?.orderCount ?? null };
     }
   } catch (err) {
