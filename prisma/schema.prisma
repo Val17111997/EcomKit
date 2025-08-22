@@ -1,13 +1,7 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "sqlite"
   url      = "file:dev.sqlite"
@@ -32,15 +26,25 @@ model Session {
 }
 
 model UsageSubscription {
-  id             Int      @id @default(autoincrement())
-  shop           String
-  subscriptionId String   @unique
-  lineItemId     String
-  status         String   @default("PENDING")
-  orderCount     Int      @default(0)
-  cycleStart     DateTime
+  id              Int       @id @default(autoincrement())
+  shop            String
+  subscriptionId  String    @unique
+  lineItemId      String
+  status          String    @default("PENDING")
+  orderCount      Int       @default(0)
+  cycleStart      DateTime?           // <- optionnel
   confirmationUrl String?
 
   @@index([shop])
 }
 
+model UsageBillingState {
+  id           Int     @id @default(autoincrement())
+  shop         String
+  periodKey    String
+  billedTier   Int     @default(0)   // 0: <=30, 1: 31–300, 2: >300
+  billedAmount Float   @default(0)
+  lastIdemKey  String? @unique
+
+  @@unique([shop, periodKey])
+}

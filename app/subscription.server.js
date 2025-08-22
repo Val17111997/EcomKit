@@ -1,16 +1,13 @@
 import prisma from "./db.server";
 
 export async function processMonthlyUsage(admin, shop, existingUsage) {
-  let usage = existingUsage;
-  if (!usage) {
-    usage = await prisma.usageSubscription.findFirst({
-      where: { shop, status: "ACTIVE" },
-    });
-  } else {
-    usage = await prisma.usageSubscription.findFirst({ 
-      where: { subscriptionId: existingUsage.subscriptionId } 
-    });
+  let usage = existingUsage || await prisma.usageSubscription.findFirst({ where: { shop, status: "ACTIVE" } });
+  
+  // PATCH 2: Si usage ne vient pas de la DB (pas d'id numérique), on le recharge
+  if (!usage || typeof usage.id !== "number") {
+    usage = await prisma.usageSubscription.findFirst({ where: { shop, status: "ACTIVE" } });
   }
+  
   if (!usage) return null;
 
   // Compte les commandes Shopify pour le mois courant
@@ -25,12 +22,13 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
     console.log(`[USAGE] 🚀 Comptage automatique activé (approbation Shopify obtenue)`);
     
     // Compte les commandes du mois via GraphQL
-    const startDate = startOfMonth.toISOString().split('T')[0];
-    const endDate = endOfMonth.toISOString().split('T')[0];
+    const startDate = startOfMonth.toISOString(); // 2025-08-01T00:00:00.000Z
+    const endDate = endOfMonth.toISOString(); // 2025-08-31T23:59:59.000Z
+    const queryString = `created_at:>=${startDate} created_at:<=${endDate} -status:cancelled -test:true (financial_status:paid OR financial_status:partially_paid)`;
     
     const response = await admin.graphql(`
-      query {
-        orders(first: 250, query: "created_at:>=${startDate} created_at:<=${endDate}") {
+      query OrdersCount($query: String!) {
+        orders(first: 250, query: $query) {
           edges {
             node {
               id
@@ -43,7 +41,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
           }
         }
       }
-    `);
+    `, { variables: { query: queryString } });
 
     const json = await response.json();
     console.log(`[DEBUG] Réponse GraphQL orders reçue`);
@@ -61,8 +59,8 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
         console.log(`[DEBUG] Pagination: récupération de la suite...`);
         
         const nextResponse = await admin.graphql(`
-          query {
-            orders(first: 250, after: "${lastCursor}", query: "created_at:>=${startDate} created_at:<=${endDate}") {
+          query OrdersNext($query: String!, $cursor: String!) {
+            orders(first: 250, after: $cursor, query: $query) {
               edges {
                 node {
                   id
@@ -74,7 +72,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
               }
             }
           }
-        `);
+        `, { variables: { query: queryString, cursor: lastCursor } });
         
         const nextJson = await nextResponse.json();
         
@@ -110,51 +108,98 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
     console.warn(`[USAGE] ⚠️  Vérifiez que l'app a bien été réinstallée après approbation`);
   }
 
-  const cycle = new Date(usage.cycleStart);
-  // Si déjà facturé ce mois-ci, on skippe
-  if (
-    cycle.getUTCFullYear() === now.getUTCFullYear() &&
-    cycle.getUTCMonth() === now.getUTCMonth()
-  ) {
-    return usage;
-  }
-
-  let amount = 0;
-  if (orderCount > 300) amount = 39.9;
-  else if (orderCount > 30) amount = 19.9;
-
-  if (amount > 0) {
-    try {
-      const response = await admin.graphql(
-        `mutation usage($id: ID!, $price: MoneyInput!) {
-          appUsageRecordCreate(
-            subscriptionLineItemId: $id,
-            description: "Monthly usage",
-            price: $price
-          ) {
-            userErrors { field message }
-          }
-        }`,
-        { variables: { id: usage.lineItemId, price: { amount, currencyCode: "EUR" } } }
-      );
-      const json = await response.json();
-      const errors = json?.data?.appUsageRecordCreate?.userErrors;
-      if (errors?.length) {
-        console.error(
-          "[USAGE] Erreurs création usage:",
-          errors.map((e) => e.message).join(", ")
-        );
-      }
-    } catch (err) {
-      console.error("Erreur facturation usage:", err);
-    }
-  }
-
-  // Mets à jour la base uniquement pour garder une trace (optionnel)
-  return await prisma.usageSubscription.update({
-    where: { id: usage.id }, // Utilise l'id auto-increment pour l'update
-    data: { orderCount, cycleStart: now },
+  // On met TOUJOURS à jour le compteur pour l'UI
+  await prisma.usageSubscription.update({
+    where: { id: usage.id },
+    data: { orderCount },
   });
+
+  // === NOUVELLE LOGIQUE FACTURATION PAR DELTA ===
+  const TIERS = [
+    { tier: 0, price: 0 },
+    { tier: 1, price: 19.9 },
+    { tier: 2, price: 39.9 },
+  ];
+  const pickTier = (n) => (n > 300 ? 2 : n > 30 ? 1 : 0);
+  const periodKeyOf = (d) =>
+    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  const periodKey = periodKeyOf(now);
+  const currentTier = pickTier(orderCount);
+  
+  // 1) Récupère/initialise l'état du mois
+  let state = await prisma.usageBillingState.findUnique({
+    where: { shop_periodKey: { shop, periodKey } },
+  });
+  if (!state) {
+    state = await prisma.usageBillingState.create({
+      data: { shop, periodKey, billedTier: 0, billedAmount: 0 },
+    });
+  }
+  
+  // 2) Si palier pas augmenté → rien à facturer
+  if (currentTier <= state.billedTier) {
+    return { ...usage, orderCount };
+  }
+  
+  // 3) Calculer le DELTA à facturer (ex: 39.9 - 19.9 = 20.0)
+  const delta = TIERS[currentTier].price - TIERS[state.billedTier].price;
+  if (delta <= 0) {
+    return { ...usage, orderCount };
+  }
+  
+  // 4) Idempotence applicative pour éviter un double débit en cas de retry
+  const idemKey = `${shop}:${periodKey}:${state.billedTier}->${currentTier}`;
+  if (state.lastIdemKey === idemKey) {
+    return { ...usage, orderCount };
+  }
+  
+  // 5) Créer l'AppUsageRecord pour le delta uniquement
+  try {
+    const resp = await admin.graphql(
+      `mutation usage($id: ID!, $price: MoneyInput!, $desc: String!) {
+        appUsageRecordCreate(
+          subscriptionLineItemId: $id,
+          description: $desc,
+          price: $price
+        ) { userErrors { field message } }
+      }`,
+      {
+        variables: {
+          id: usage.lineItemId,
+          price: { amount: delta, currencyCode: "EUR" },
+          desc: `Monthly usage ${periodKey} — tier ${state.billedTier}→${currentTier} (+${delta.toFixed(2)}€)`,
+        },
+      }
+    );
+    const json = await resp.json();
+    const errors = json?.data?.appUsageRecordCreate?.userErrors;
+    if (errors?.length) {
+      console.error("[USAGE] create error:", errors.map(e => e.message).join(", "));
+    } else {
+      await prisma.$transaction([
+        prisma.usageBillingState.update({
+          where: { shop_periodKey: { shop, periodKey } },
+          data: {
+            billedTier: currentTier,
+            billedAmount: state.billedAmount + delta,
+            lastIdemKey: idemKey,
+          },
+        }),
+        prisma.usageSubscription.update({
+          where: { id: usage.id },
+          data: { cycleStart: now }, // optionnel
+        }),
+      ]);
+      console.log("[USAGE] 💸 billed delta €", delta, "tier", state.billedTier, "->", currentTier);
+    }
+  } catch (e) {
+    console.error("bill delta error:", e);
+  }
+  
+  const updatedUsage = await prisma.usageSubscription.findUnique({
+    where: { id: usage.id }
+  });
+  return { ...updatedUsage, orderCount };
 }
 
 // Check if the shop has an active subscription. If not, create a new one and return the confirmation URL.
@@ -179,35 +224,24 @@ export async function ensureActiveSubscription(admin, shop) {
     
     if (activeShopify) {
       console.log("[SUBSCRIPTION] Abonnement actif trouvé côté Shopify, synchronisation de la base");
-      // Cherche d'abord s'il existe déjà un enregistrement pour ce shop avec cet abonnement
-      const existing = await prisma.usageSubscription.findFirst({
-        where: { 
+      
+      // Utilise upsert pour éviter P2002 (Unique constraint failed)
+      await prisma.usageSubscription.upsert({
+        where: { subscriptionId: activeShopify.id },
+        update: {
+          status: "ACTIVE",
+          confirmationUrl: null,
+          lineItemId: activeShopify.lineItems[0].id,
+          shop // s'assurer que le shop est correct
+        },
+        create: {
           shop,
-          subscriptionId: activeShopify.id 
+          subscriptionId: activeShopify.id,
+          lineItemId: activeShopify.lineItems[0].id,
+          status: "ACTIVE"
+          // Pas de cycleStart ici - sera défini après première facturation
         }
       });
-
-      if (existing) {
-        await prisma.usageSubscription.update({
-          where: { id: existing.id }, // Utilise l'id auto-increment
-          data: {
-            status: "ACTIVE",
-            confirmationUrl: null,
-            lineItemId: activeShopify.lineItems[0].id,
-          }
-        });
-      } else {
-        await prisma.usageSubscription.create({
-          data: {
-            shop,
-            subscriptionId: activeShopify.id,
-            lineItemId: activeShopify.lineItems[0].id,
-            status: "ACTIVE",
-            confirmationUrl: null,
-            cycleStart: new Date(),
-          }
-        });
-      }
       
       // Annule tous les autres abonnements pour ce shop
       await prisma.usageSubscription.updateMany({
@@ -218,8 +252,13 @@ export async function ensureActiveSubscription(admin, shop) {
         data: { status: "CANCELLED", confirmationUrl: null },
       });
       
-      await processMonthlyUsage(admin, shop, { ...activeShopify, shop });
-      return { active: true };
+      // PATCH 1: Récupère l'enregistrement DB (id numérique) et PAS l'objet Shopify
+      const dbUsage = await prisma.usageSubscription.findFirst({
+        where: { shop, subscriptionId: activeShopify.id },
+      });
+      
+      const res = await processMonthlyUsage(admin, shop, dbUsage);
+      return { active: true, orderCount: res?.orderCount ?? null };
     }
   } catch (err) {
     console.error("Erreur check live subscription Shopify:", err);
@@ -232,8 +271,8 @@ export async function ensureActiveSubscription(admin, shop) {
   });
 
   if (active && !active.confirmationUrl) {
-    await processMonthlyUsage(admin, shop, active);
-    return { active: true };
+    const res = await processMonthlyUsage(admin, shop, active);
+    return { active: true, orderCount: res?.orderCount ?? null };
   }
 
   // 3. Gestion des abonnements PENDING
@@ -265,8 +304,8 @@ export async function ensureActiveSubscription(admin, shop) {
       where: { shop, id: { not: pending.id } }, // Utilise l'id auto-increment
       data: { status: "CANCELLED", confirmationUrl: null },
     });
-    await processMonthlyUsage(admin, shop, pending);
-    return { active: true };
+    const res = await processMonthlyUsage(admin, shop, pending);
+    return { active: true, orderCount: res?.orderCount ?? null };
   }
 
   if (pending && subscriptionStatus === "PENDING") {
@@ -320,8 +359,8 @@ export async function ensureActiveSubscription(admin, shop) {
         subscriptionId: payload.appSubscription.id,
         lineItemId: payload.appSubscription.lineItems[0].id,
         status: "PENDING",
-        confirmationUrl: payload.confirmationUrl,
-        cycleStart: new Date(),
+        confirmationUrl: payload.confirmationUrl
+        // Pas de cycleStart - sera défini après première facturation
       },
     });
     console.log("[SUBSCRIPTION] Apres creation en base");
