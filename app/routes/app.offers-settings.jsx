@@ -1,3 +1,4 @@
+// app/routes/app.offers-config.jsx
 import { useState, useCallback, useEffect } from "react";
 import { json } from "@remix-run/node";
 import { useLoaderData, useActionData, Form, useSubmit, useNavigation } from "@remix-run/react";
@@ -15,13 +16,14 @@ import {
   InlineStack,
   Tabs,
   Box,
-  List,
   Icon,
-  Collapsible,
-  Link,
-  Image
+  Frame,
+  ContextualSaveBar,
+  Badge,
+  BlockStack,
+  ButtonGroup
 } from "@shopify/polaris";
-import { CheckSmallIcon, InfoIcon } from '@shopify/polaris-icons';
+import { CheckSmallIcon } from '@shopify/polaris-icons';
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
@@ -265,306 +267,7 @@ export const action = async ({ request }) => {
   }
 };
 
-// Composant Guide de personnalisation
-function CustomizationGuide() {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
-  
-  return (
-    <Card sectioned>
-      <InlineStack align="space-between" blockAlign="center">
-        <div>
-          <Text variant="headingMd" as="h2">
-            Étape 3 : Personnalisez l'affichage
-          </Text>
-          <Text variant="bodyMd" color="subdued">
-            Découvrez comment personnaliser l'affichage et sélectionner vos produits complémentaires
-          </Text>
-        </div>
-        <Button onClick={handleToggle} plain>
-          {isOpen ? "Masquer" : "Afficher"} le guide
-        </Button>
-      </InlineStack>
-      
-      <Collapsible open={isOpen} id="customization-guide">
-        <Box paddingBlockStart="4">
-          <div style={{ marginBottom: "1rem" }}>
-            <Text variant="headingMd" as="h3">Comment personnaliser votre BoostCart ?</Text>
-          </div>
-          
-          <List type="number">
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Styles et couleurs :</strong> Adaptez l'apparence de votre progress bar aux couleurs de votre marque
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Messages personnalisés :</strong> Rédigez des messages engageants qui incitent à l'achat
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Produits complémentaires :</strong> Sélectionnez les produits à proposer en cadeau selon vos objectifs
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Position et timing :</strong> Définissez où et quand afficher votre progress bar pour un impact maximal
-              </Text>
-            </List.Item>
-          </List>
-          
-          <Box paddingBlockStart="4">
-            <Image
-              source="/images/etape-3-BoostCart.jpg"
-              alt="Guide de personnalisation BoostCart"
-              width={300}
-              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
-            />
-          </Box>
-          
-          <Box paddingBlockStart="4">
-            <Button 
-              url="shopify:admin/themes/current/editor?context=apps"
-              external
-              variant="primary"
-            >
-              Personnaliser l'affichage
-            </Button>
-          </Box>
-        </Box>
-      </Collapsible>
-    </Card>
-  );
-}
-
-// Composant Guide d'activation
-function ActivationGuide() {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
-  
-  return (
-    <Card sectioned>
-      <InlineStack align="space-between" blockAlign="center">
-        <div>
-          <Text variant="headingMd" as="h2">
-            Étape 1 : Activez l'extension dans votre thème Shopify
-          </Text>
-          <Text variant="bodyMd" color="subdued">
-            Découvrez comment activer le panier BoostCart
-          </Text>
-        </div>
-        <Button onClick={handleToggle} plain>
-          {isOpen ? "Masquer" : "Afficher"} le guide
-        </Button>
-      </InlineStack>
-      
-      <Collapsible open={isOpen} id="activation-guide">
-        <Box paddingBlockStart="4">
-          <div style={{ marginBottom: "1rem" }}>
-            <Text variant="headingMd" as="h3">Comment activer BoostCart dans votre thème ?</Text>
-          </div>
-          
-          <List type="number">
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Accédez à votre admin Shopify :</strong> Allez dans "Boutique en ligne" → "Thèmes"
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Personnalisez votre thème :</strong> Cliquez sur "Personnaliser" à côté de votre thème actif
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Ajoutez l'extension :</strong> Dans l'éditeur de thème, allez dans "Extensions d'applications" et activez "BoostCart"
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Enregistrez :</strong> Cliquez sur "Enregistrer" pour publier les modifications
-              </Text>
-            </List.Item>
-          </List>
-          
-          <Box paddingBlockStart="4">
-            <Image
-              source="/images/etape-1-BoostCart.jpg"
-              alt="Guide d'activation BoostCart"
-              width={300}
-              style={{ borderRadius: "8px", border: "1px solid #e1e3e5" }}
-            />
-          </Box>
-          
-          <Box paddingBlockStart="4">
-            <Button 
-              url="shopify:admin/themes/current/editor?context=apps"
-              external
-              variant="primary"
-            >
-              Personnaliser le thème
-            </Button>
-          </Box>
-        </Box>
-      </Collapsible>
-    </Card>
-  );
-}
-
-// Composant Guide de démarrage
-function StartupGuide() {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const handleToggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
-  
-  return (
-    <Card sectioned>
-      <InlineStack align="space-between" blockAlign="center">
-        <div>
-          <Text variant="headingMd" as="h2">
-            Étape 2 : Configurez vos offres paniers pour la Progress Bar
-          </Text>
-          <Text variant="bodyMd" color="subdued">
-            Découvrez comment configurer vos offres BoostCart
-          </Text>
-        </div>
-        <Button onClick={handleToggle} plain>
-          {isOpen ? "Masquer" : "Afficher"} le guide
-        </Button>
-      </InlineStack>
-      
-      <Collapsible open={isOpen} id="startup-guide">
-        <Box paddingBlockStart="4">
-          <div style={{ marginBottom: "1rem" }}>
-            <Text variant="headingMd" as="h3">Comment créer des offres efficaces ?</Text>
-          </div>
-          
-          <List type="number">
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Choisissez le type d'offre :</strong> Livraison offerte (pour encourager les achats) ou Cadeau offert (pour augmenter la valeur perçue)
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Définissez des seuils progressifs :</strong> Ex: 50€, 75€, 100€ pour créer un effet d'escalier
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Personnalisez vos messages :</strong> Utilisez <code>[amount_left]</code> pour afficher le montant restant
-              </Text>
-            </List.Item>
-            <List.Item>
-              <Text variant="bodyMd">
-                <strong>Pour les cadeaux :</strong> Ajoutez l'URL du produit (ex: /products/echantillon-gratuit)
-              </Text>
-            </List.Item>
-          </List>
-          
-          <Box paddingBlockStart="4">
-            <Banner status="info">
-              <Text variant="bodyMd">
-                <strong>💡 Astuce pour les produits offerts :</strong> Créez un produit avec le nom du produit suivi de "offert" (ex: "Magnésium marin offert"), définissez le prix à 0€ et renseignez le prix avant réduction (ex: prix avant réduction 14€, prix final 0€). Cela permettra d'afficher la valeur du cadeau tout en l'offrant gratuitement.
-              </Text>
-            </Banner>
-          </Box>
-        </Box>
-      </Collapsible>
-    </Card>
-  );
-}
-
-// Composant pour gérer une offre
-function OfferForm({ index, settings, onChange }) {
-  const offerTypes = [
-    { label: "Livraison offerte", value: "shipping" },
-    { label: "Cadeau offert", value: "gift" }
-  ];
-  
-  const offerNumber = index + 1;
-  
-  // Récupérer les valeurs de cette offre
-  const enabled = settings[`enable_offer${offerNumber}`];
-  const type = settings[`offer${offerNumber}_type`];
-  const threshold = settings[`offer${offerNumber}_threshold`];
-  const textBefore = settings[`offer${offerNumber}_text_before`];
-  const textAfter = settings[`offer${offerNumber}_text_after`];
-  const productUrl = settings[`offer${offerNumber}_product_url`];
-  
-  return (
-    <div style={{ padding: "1rem 0" }}>
-      <FormLayout>
-        <Checkbox
-          label={`Activer l'offre ${offerNumber}`}
-          checked={enabled}
-          onChange={(value) => onChange(`enable_offer${offerNumber}`, value)}
-        />
-        
-        <Select
-          label="Type d'offre"
-          options={offerTypes}
-          value={type}
-          onChange={(value) => onChange(`offer${offerNumber}_type`, value)}
-          disabled={!enabled}
-        />
-        
-        <TextField
-          label={`Seuil d'activation (en €)`}
-          type="number"
-          value={String(threshold)}
-          onChange={(value) => onChange(`offer${offerNumber}_threshold`, value)}
-          disabled={!enabled}
-        />
-        
-        <TextField
-          label="Message avant activation"
-          value={textBefore}
-          onChange={(value) => onChange(`offer${offerNumber}_text_before`, value)}
-          helpText="Utilisez [amount_left] pour afficher le montant restant"
-          disabled={!enabled}
-          multiline={2}
-        />
-        
-        <TextField
-          label="Message après activation"
-          value={textAfter}
-          onChange={(value) => onChange(`offer${offerNumber}_text_after`, value)}
-          disabled={!enabled}
-          multiline={2}
-        />
-        
-        {type === "gift" && (
-          <TextField
-            label="URL du produit à offrir"
-            value={productUrl}
-            onChange={(value) => onChange(`offer${offerNumber}_product_url`, value)}
-            placeholder="/products/nom-du-produit"
-            helpText="Entrez l'URL du produit à offrir (ex: /products/mon-produit)"
-            disabled={!enabled}
-          />
-        )}
-        
-        {enabled && (
-          <Banner status="info">
-            <InlineStack gap="2" blockAlign="center">
-              <Icon source={CheckSmallIcon} />
-              <Text variant="bodyMd">
-                <strong>Aperçu :</strong> Cette offre sera activée quand le panier atteindra {threshold}€
-              </Text>
-            </InlineStack>
-          </Banner>
-        )}
-      </FormLayout>
-    </div>
-  );
-}
-
-export default function OffersSettings() {
+export default function OffersConfig() {
   const loaderData = useLoaderData();
   const { offersSettings, error } = loaderData;
   const actionData = useActionData();
@@ -573,19 +276,21 @@ export default function OffersSettings() {
   
   // État local pour les settings
   const [settings, setSettings] = useState(offersSettings || {});
-  
-  // État pour les onglets
-  const [selectedTab, setSelectedTab] = useState(0);
-  
-  // État pour la section configuration
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  // État pour les settings originaux (pour détecter les changements)
+  const [originalSettings, setOriginalSettings] = useState(offersSettings || {});
   
   // Mise à jour des settings si les données chargées changent
   useEffect(() => {
     if (offersSettings) {
       setSettings(offersSettings);
+      setOriginalSettings(offersSettings);
     }
   }, [offersSettings]);
+  
+  // Fonction pour détecter si il y a des modifications non sauvegardées (dirty state)
+  const isDirty = () => {
+    return JSON.stringify(settings) !== JSON.stringify(originalSettings);
+  };
   
   // Mettre à jour un champ
   const handleSettingChange = (key, value) => {
@@ -593,6 +298,23 @@ export default function OffersSettings() {
       ...prev,
       [key]: value
     }));
+  };
+  
+  // Annuler les modifications
+  const handleCancel = () => {
+    setSettings(originalSettings);
+  };
+
+  // Fonction pour faire défiler vers une offre spécifique
+  const scrollToOffer = (offerNumber) => {
+    const element = document.getElementById(`offer-${offerNumber}`);
+    if (element) {
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start',
+        inline: 'nearest' 
+      });
+    }
   };
   
   // Soumettre le formulaire
@@ -627,143 +349,449 @@ export default function OffersSettings() {
       setStatusMessage(actionData.message);
       setIsSuccess(actionData.success);
       
+      // Si la sauvegarde a réussi, mettre à jour les settings originaux
+      if (actionData.success) {
+        setOriginalSettings(settings);
+      }
+      
       const timer = setTimeout(() => {
         setShowStatusMessage(false);
       }, 5000);
       
       return () => clearTimeout(timer);
     }
-  }, [actionData]);
-  
-  // Configuration des onglets
-  const tabs = [
-    {
-      id: 'offer1',
-      content: 'Offre 1',
-      panelID: 'offer1-panel',
-    },
-    {
-      id: 'offer2',
-      content: 'Offre 2',
-      panelID: 'offer2-panel',
-    },
-    {
-      id: 'offer3',
-      content: 'Offre 3',
-      panelID: 'offer3-panel',
-    },
-  ];
-  
-  const handleTabChange = useCallback((selectedTabIndex) => {
-    setSelectedTab(selectedTabIndex);
-  }, []);
-  
-  const handleConfigToggle = useCallback(() => setIsConfigOpen(!isConfigOpen), [isConfigOpen]);
-  
+  }, [actionData, settings]);
+
   return (
-    <Page
-      title="Paramètres des offres Panier"
-      subtitle="Configurez les offres à afficher dans votre panier BoostCart"
-      primaryAction={{
-        content: "Enregistrer toutes les offres",
-        onAction: handleSubmit,
-        loading: isSubmitting
-      }}
-    >
-      {/* Bannière */}
-      <Box paddingBlockEnd="6">
-        <Image
-          source="/images/banniere-boostcart.png"
-          alt="BoostCart"
-          width="100%"
-          style={{ borderRadius: "8px" }}
-        />
-      </Box>
-      
-      {/* Message de statut */}
-      {(showStatusMessage || error) && (
-        <Box paddingBlockEnd="4">
-          <Banner
-            status={isSuccess ? "success" : "critical"}
-          >
-            {error || statusMessage}
-          </Banner>
-        </Box>
-      )}
-      
-      <Layout>
-        {/* Guide d'activation */}
-        <Layout.Section>
-          <ActivationGuide />
-        </Layout.Section>
-        
-        {/* Guide de démarrage */}
-        <Layout.Section>
-          <StartupGuide />
-        </Layout.Section>
-        
-        {/* Configuration des offres */}
-        <Layout.Section>
-          <Card sectioned>
-            <InlineStack align="space-between" blockAlign="center">
-              <div>
-                <Text variant="headingMd" as="h2">
-                  Configuration des offres
-                </Text>
-                <Text variant="bodyMd" color="subdued">
-                  Configurez jusqu'à 3 offres progressives pour votre panier
-                </Text>
-              </div>
-              <Button onClick={handleConfigToggle} plain>
-                {isConfigOpen ? "Masquer" : "Afficher"} la configuration
-              </Button>
-            </InlineStack>
-            
-            <Collapsible open={isConfigOpen} id="offers-config">
-              <Box paddingBlockStart="4">
-                {/* Barre de contrôle des offres */}
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  gap: '24px',
-                  padding: '16px',
-                  backgroundColor: '#F6F6F7',
-                  borderRadius: '12px',
-                  marginBottom: '20px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#202223' }}>Offre 1</span>
-                    <div 
-                      style={{
-                        width: '44px',
-                        height: '24px',
-                        backgroundColor: settings.enable_offer1 ? '#00A651' : '#E1E3E5',
-                        borderRadius: '12px',
-                        position: 'relative',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onClick={() => handleSettingChange('enable_offer1', !settings.enable_offer1)}
-                    >
-                      <div style={{
-                        width: '20px',
-                        height: '20px',
-                        backgroundColor: 'white',
-                        borderRadius: '50%',
-                        position: 'absolute',
-                        top: '2px',
-                        left: settings.enable_offer1 ? '22px' : '2px',
-                        transition: 'all 0.2s ease',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                      }}></div>
-                    </div>
+    <Frame>
+      <div style={{ paddingBottom: '4rem' }}>
+        <Page
+          title="Configuration des offres"
+          subtitle="Définissez jusqu'à 3 paliers progressifs pour inciter vos clients à augmenter leur panier."
+        >
+          {/* Message de statut */}
+          {(showStatusMessage || error) && (
+            <Box paddingBlockEnd="4">
+              <Banner
+                status={isSuccess ? "success" : "critical"}
+              >
+                {error || statusMessage}
+              </Banner>
+            </Box>
+          )}
+          
+          <Layout>
+            {/* Résumé global */}
+            <Layout.Section>
+              <Card>
+                <Box padding="5">
+                  <Text variant="headingMd" as="h2" color="subdued">Résumé global</Text>
+                  <div style={{ marginTop: '10px' }}>
+                    <InlineStack gap="600" align="center" blockAlign="start" wrap={false}>
+                      {/* Offre 1 */}
+                      <div
+                        style={{
+                          width: "18rem",
+                          boxShadow: settings.enable_offer1 ? "0px 0px 15px 4px #E8F5E8" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+                          borderRadius: ".75rem",
+                          position: "relative",
+                          zIndex: "0",
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => scrollToOffer(1)}
+                        onMouseEnter={(e) => {
+                          if (!settings.enable_offer1) {
+                            e.currentTarget.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.12)';
+                          }
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = settings.enable_offer1 ? "0px 0px 15px 4px #E8F5E8" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)";
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        {settings.enable_offer1 && (
+                          <div style={{ position: "absolute", top: "-15px", right: "6px", zIndex: "100" }}>
+                            <Badge size="large" tone="success">
+                              Activée
+                            </Badge>
+                          </div>
+                        )}
+                        <Card>
+                          <BlockStack gap="400">
+                            <BlockStack gap="200" align="start">
+                              <Text as="h3" variant="headingLg">
+                                Offre 1
+                              </Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {settings.enable_offer1 ? 
+                                  (settings.offer1_type === 'shipping' ? 'Livraison gratuite' : 'Cadeau offert')
+                                  : 'Non configuré'}
+                              </Text>
+                            </BlockStack>
+                            <InlineStack blockAlign="end" gap="100" align="start">
+                              <Text as="h2" variant="heading2xl">
+                                {settings.enable_offer1 ? `${settings.offer1_threshold}€` : '–'}
+                              </Text>
+                              <Box paddingBlockEnd="200">
+                                <Text variant="bodySm">seuil</Text>
+                              </Box>
+                            </InlineStack>
+                            <BlockStack gap="100">
+                              <Text tone="subdued" as="p" variant="bodyMd">
+                                <strong>Type :</strong> {settings.enable_offer1 ? 
+                                  (settings.offer1_type === 'shipping' ? 'Livraison offerte' : 'Cadeau offert') 
+                                  : 'Non configuré'}
+                              </Text>
+                              <Text tone="subdued" as="p" variant="bodyMd">
+                                <strong>Bénéfice :</strong> {settings.enable_offer1 ? 
+                                  (settings.offer1_type === 'shipping' ? 
+                                    `Livraison gratuite dès ${settings.offer1_threshold}€` : 
+                                    'Cadeau offert'
+                                  ) : 'Non configuré'}
+                              </Text>
+                            </BlockStack>
+                            <Box paddingBlockStart="200" paddingBlockEnd="200">
+                              <ButtonGroup fullWidth>
+                                <Button 
+                                  variant={settings.enable_offer1 ? "primary" : "secondary"}
+                                  onClick={() => scrollToOffer(1)}
+                                >
+                                  {settings.enable_offer1 ? 'Modifier' : 'Configurer'}
+                                </Button>
+                              </ButtonGroup>
+                            </Box>
+                          </BlockStack>
+                        </Card>
+                      </div>
+
+                      {/* Offre 2 */}
+                      <div
+                        style={{
+                          width: "18rem",
+                          boxShadow: settings.enable_offer2 ? "0px 0px 15px 4px #E8F5E8" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+                          borderRadius: ".75rem",
+                          position: "relative",
+                          zIndex: "0",
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => scrollToOffer(2)}
+                        onMouseEnter={(e) => {
+                          if (!settings.enable_offer2) {
+                            e.currentTarget.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.12)';
+                          }
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = settings.enable_offer2 ? "0px 0px 15px 4px #E8F5E8" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)";
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        {settings.enable_offer2 && (
+                          <div style={{ position: "absolute", top: "-15px", right: "6px", zIndex: "100" }}>
+                            <Badge size="large" tone="success">
+                              Activée
+                            </Badge>
+                          </div>
+                        )}
+                        <Card>
+                          <BlockStack gap="400">
+                            <BlockStack gap="200" align="start">
+                              <Text as="h3" variant="headingLg">
+                                Offre 2
+                              </Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {settings.enable_offer2 ? 
+                                  (settings.offer2_type === 'shipping' ? 'Livraison gratuite' : 'Cadeau offert')
+                                  : 'Non configuré'}
+                              </Text>
+                            </BlockStack>
+                            <InlineStack blockAlign="end" gap="100" align="start">
+                              <Text as="h2" variant="heading2xl">
+                                {settings.enable_offer2 ? `${settings.offer2_threshold}€` : '–'}
+                              </Text>
+                              <Box paddingBlockEnd="200">
+                                <Text variant="bodySm">seuil</Text>
+                              </Box>
+                            </InlineStack>
+                            <BlockStack gap="100">
+                              <Text tone="subdued" as="p" variant="bodyMd">
+                                <strong>Type :</strong> {settings.enable_offer2 ? 
+                                  (settings.offer2_type === 'shipping' ? 'Livraison offerte' : 'Cadeau offert') 
+                                  : 'Non configuré'}
+                              </Text>
+                              <Text tone="subdued" as="p" variant="bodyMd">
+                                <strong>Bénéfice :</strong> {settings.enable_offer2 ? 
+                                  (settings.offer2_type === 'shipping' ? 
+                                    `Livraison gratuite dès ${settings.offer2_threshold}€` : 
+                                    'Cadeau offert'
+                                  ) : 'Non configuré'}
+                              </Text>
+                            </BlockStack>
+                            <Box paddingBlockStart="200" paddingBlockEnd="200">
+                              <ButtonGroup fullWidth>
+                                <Button 
+                                  variant={settings.enable_offer2 ? "primary" : "secondary"}
+                                  onClick={() => scrollToOffer(2)}
+                                >
+                                  {settings.enable_offer2 ? 'Modifier' : 'Configurer'}
+                                </Button>
+                              </ButtonGroup>
+                            </Box>
+                          </BlockStack>
+                        </Card>
+                      </div>
+
+                      {/* Offre 3 */}
+                      <div
+                        style={{
+                          width: "18rem",
+                          boxShadow: settings.enable_offer3 ? "0px 0px 15px 4px #E8F5E8" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)",
+                          borderRadius: ".75rem",
+                          position: "relative",
+                          zIndex: "0",
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => scrollToOffer(3)}
+                        onMouseEnter={(e) => {
+                          if (!settings.enable_offer3) {
+                            e.currentTarget.style.boxShadow = '0 8px 16px 0 rgba(0, 0, 0, 0.12)';
+                          }
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = settings.enable_offer3 ? "0px 0px 15px 4px #E8F5E8" : "0 1px 3px 0 rgba(0, 0, 0, 0.1)";
+                          e.currentTarget.style.transform = 'translateY(0)';
+                        }}
+                      >
+                        {settings.enable_offer3 && (
+                          <div style={{ position: "absolute", top: "-15px", right: "6px", zIndex: "100" }}>
+                            <Badge size="large" tone="success">
+                              Activée
+                            </Badge>
+                          </div>
+                        )}
+                        <Card>
+                          <BlockStack gap="400">
+                            <BlockStack gap="200" align="start">
+                              <Text as="h3" variant="headingLg">
+                                Offre 3
+                              </Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {settings.enable_offer3 ? 
+                                  (settings.offer3_type === 'shipping' ? 'Livraison gratuite' : 'Cadeau offert')
+                                  : 'Non configuré'}
+                              </Text>
+                            </BlockStack>
+                            <InlineStack blockAlign="end" gap="100" align="start">
+                              <Text as="h2" variant="heading2xl">
+                                {settings.enable_offer3 ? `${settings.offer3_threshold}€` : '–'}
+                              </Text>
+                              <Box paddingBlockEnd="200">
+                                <Text variant="bodySm">seuil</Text>
+                              </Box>
+                            </InlineStack>
+                            <BlockStack gap="100">
+                              <Text tone="subdued" as="p" variant="bodyMd">
+                                <strong>Type :</strong> {settings.enable_offer3 ? 
+                                  (settings.offer3_type === 'shipping' ? 'Livraison offerte' : 'Cadeau offert') 
+                                  : 'Non configuré'}
+                              </Text>
+                              <Text tone="subdued" as="p" variant="bodyMd">
+                                <strong>Bénéfice :</strong> {settings.enable_offer3 ? 
+                                  (settings.offer3_type === 'shipping' ? 
+                                    `Livraison gratuite dès ${settings.offer3_threshold}€` : 
+                                    'Cadeau offert'
+                                  ) : 'Non configuré'}
+                              </Text>
+                            </BlockStack>
+                            <Box paddingBlockStart="200" paddingBlockEnd="200">
+                              <ButtonGroup fullWidth>
+                                <Button 
+                                  variant={settings.enable_offer3 ? "primary" : "secondary"}
+                                  onClick={() => scrollToOffer(3)}
+                                >
+                                  {settings.enable_offer3 ? 'Modifier' : 'Configurer'}
+                                </Button>
+                              </ButtonGroup>
+                            </Box>
+                          </BlockStack>
+                        </Card>
+                      </div>
+                    </InlineStack>
                   </div>
                   
-                  <div style={{ color: '#D1D5DB', fontSize: '18px', fontWeight: '300' }}>⏐</div>
+                  <Box paddingBlockStart="5">
+                    <Text variant="bodyMd" color="subdued" alignment="center">
+                      Cliquez sur une carte pour configurer l'offre correspondante
+                    </Text>
+                  </Box>
+                </Box>
+              </Card>
+            </Layout.Section>
+
+            {/* Offre 1 */}
+            <Layout.Section>
+              <div id="offer-1">
+                <Card>
+                  <Box padding="5">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <Text variant="headingMd" fontWeight="bold">Offre 1</Text>
+                      <div 
+                        style={{
+                          width: '44px',
+                          height: '24px',
+                          backgroundColor: settings.enable_offer1 ? '#00A651' : '#E1E3E5',
+                          borderRadius: '12px',
+                          position: 'relative',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onClick={() => handleSettingChange('enable_offer1', !settings.enable_offer1)}
+                      >
+                        <div style={{
+                          width: '20px',
+                          height: '20px',
+                          backgroundColor: 'white',
+                          borderRadius: '50%',
+                          position: 'absolute',
+                          top: '2px',
+                          left: settings.enable_offer1 ? '22px' : '2px',
+                          transition: 'all 0.2s ease',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}></div>
+                      </div>
+                    </div>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#202223' }}>Offre 2</span>
+                  {settings.enable_offer1 && (
+                    <Box paddingBlockEnd="4">
+                      <Text variant="bodyMd" color="subdued" fontStyle="italic">
+                        {settings.offer1_type === 'shipping' 
+                          ? `Livraison offerte dès ${settings.offer1_threshold}€`
+                          : `Cadeau offert dès ${settings.offer1_threshold}€`
+                        }
+                      </Text>
+                    </Box>
+                  )}
+                  
+                  {settings.enable_offer1 && (
+                    <BlockStack gap="5">
+                      <FormLayout>
+                        <Select
+                          label="Type d'offre"
+                          options={[
+                            { label: "Livraison offerte", value: "shipping" },
+                            { label: "Cadeau offert", value: "gift" }
+                          ]}
+                          value={settings.offer1_type}
+                          onChange={(value) => handleSettingChange('offer1_type', value)}
+                        />
+                        
+                        <TextField
+                          label="Seuil (TTC, en €)"
+                          type="number"
+                          value={String(settings.offer1_threshold)}
+                          onChange={(value) => handleSettingChange('offer1_threshold', value)}
+                          placeholder="55,00"
+                          helpText="Exemple : 55,00 €"
+                        />
+                        
+                        {settings.offer1_type === "gift" && (
+                          <TextField
+                            label="Produit à offrir"
+                            value={settings.offer1_product_url}
+                            onChange={(value) => handleSettingChange('offer1_product_url', value)}
+                            placeholder="Sélectionner un produit"
+                            helpText="Ce produit sera automatiquement ajouté au panier lorsque le seuil est atteint."
+                          />
+                        )}
+                        
+                        <Box paddingBlockStart="3">
+                          <Text variant="headingSm" color="subdued">Messages affichés</Text>
+                          <Box paddingBlockStart="3">
+                            <BlockStack gap="4">
+                              <TextField
+                                label="Avant activation"
+                                value={settings.offer1_text_before}
+                                onChange={(value) => handleSettingChange('offer1_text_before', value)}
+                                multiline={2}
+                                helpText="Utilisez [amount_left] pour afficher le montant restant"
+                              />
+                              
+                              <TextField
+                                label="Après activation"
+                                value={settings.offer1_text_after}
+                                onChange={(value) => handleSettingChange('offer1_text_after', value)}
+                                multiline={2}
+                              />
+                            </BlockStack>
+                          </Box>
+                        </Box>
+                        
+                        <Box paddingBlockStart="3">
+                          <Banner status="info">
+                            <BlockStack gap="2">
+                              <Text variant="bodyMd">
+                                <strong>Aperçu :</strong>
+                              </Text>
+                              <Text variant="bodyMd">
+                                À <strong>{settings.offer1_threshold}€</strong>, le client bénéficie de{" "}
+                                <strong>
+                                  {settings.offer1_type === 'shipping' ? 'la livraison offerte' : 'un cadeau offert'}
+                                </strong>.
+                              </Text>
+                              <Text variant="bodyMd">
+                                Avec un panier simulé à <strong>42,00 €</strong>, il manque{" "}
+                                <strong>{Math.max(0, settings.offer1_threshold - 42).toFixed(2)} €</strong>.
+                              </Text>
+                            </BlockStack>
+                          </Banner>
+                        </Box>
+                        
+                        <Box paddingBlockStart="4">
+                          <InlineStack gap="3">
+                            <Button
+                              primary
+                              onClick={handleSubmit}
+                              loading={isSubmitting}
+                            >
+                              Enregistrer uniquement l'offre 1
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setSettings(prev => ({
+                                  ...prev,
+                                  enable_offer1: false,
+                                  offer1_type: "shipping",
+                                  offer1_threshold: 55,
+                                  offer1_text_before: "Encore [amount_left]€ pour obtenir l'offre 1",
+                                  offer1_text_after: "Offre 1 activée !",
+                                  offer1_product_url: ""
+                                }));
+                              }}
+                            >
+                              Réinitialiser l'offre 1
+                            </Button>
+                          </InlineStack>
+                        </Box>
+                      </FormLayout>
+                    </BlockStack>
+                  )}
+                  </Box>
+                </Card>
+              </div>
+            </Layout.Section>
+
+            {/* Offre 2 */}
+            <Layout.Section>
+              <div id="offer-2">
+                <Card>
+                  <Box padding="5">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <Text variant="headingMd" fontWeight="bold">Offre 2</Text>
                     <div 
                       style={{
                         width: '44px',
@@ -790,10 +818,132 @@ export default function OffersSettings() {
                     </div>
                   </div>
                   
-                  <div style={{ color: '#D1D5DB', fontSize: '18px', fontWeight: '300' }}>⏐</div>
+                  {settings.enable_offer2 && (
+                    <Box paddingBlockEnd="4">
+                      <Text variant="bodyMd" color="subdued" fontStyle="italic">
+                        {settings.offer2_type === 'shipping' 
+                          ? `Livraison offerte dès ${settings.offer2_threshold}€`
+                          : `Cadeau offert dès ${settings.offer2_threshold}€`
+                        }
+                      </Text>
+                    </Box>
+                  )}
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#202223' }}>Offre 3</span>
+                  {settings.enable_offer2 && (
+                    <BlockStack gap="5">
+                      <FormLayout>
+                        <Select
+                          label="Type d'offre"
+                          options={[
+                            { label: "Livraison offerte", value: "shipping" },
+                            { label: "Cadeau offert", value: "gift" }
+                          ]}
+                          value={settings.offer2_type}
+                          onChange={(value) => handleSettingChange('offer2_type', value)}
+                        />
+                        
+                        <TextField
+                          label="Seuil (TTC, en €)"
+                          type="number"
+                          value={String(settings.offer2_threshold)}
+                          onChange={(value) => handleSettingChange('offer2_threshold', value)}
+                          placeholder="75,00"
+                          helpText="Exemple : 75,00 €"
+                        />
+                        
+                        {settings.offer2_type === "gift" && (
+                          <TextField
+                            label="Produit à offrir"
+                            value={settings.offer2_product_url}
+                            onChange={(value) => handleSettingChange('offer2_product_url', value)}
+                            placeholder="Sélectionner un produit"
+                            helpText="Ce produit sera automatiquement ajouté au panier lorsque le seuil est atteint."
+                          />
+                        )}
+                        
+                        <Box paddingBlockStart="3">
+                          <Text variant="headingSm" color="subdued">Messages affichés</Text>
+                          <Box paddingBlockStart="3">
+                            <BlockStack gap="4">
+                              <TextField
+                                label="Avant activation"
+                                value={settings.offer2_text_before}
+                                onChange={(value) => handleSettingChange('offer2_text_before', value)}
+                                multiline={2}
+                                helpText="Utilisez [amount_left] pour afficher le montant restant"
+                              />
+                              
+                              <TextField
+                                label="Après activation"
+                                value={settings.offer2_text_after}
+                                onChange={(value) => handleSettingChange('offer2_text_after', value)}
+                                multiline={2}
+                              />
+                            </BlockStack>
+                          </Box>
+                        </Box>
+                        
+                        <Box paddingBlockStart="3">
+                          <Banner status="info">
+                            <BlockStack gap="2">
+                              <Text variant="bodyMd">
+                                <strong>Aperçu :</strong>
+                              </Text>
+                              <Text variant="bodyMd">
+                                À <strong>{settings.offer2_threshold}€</strong>, le client bénéficie de{" "}
+                                <strong>
+                                  {settings.offer2_type === 'shipping' ? 'la livraison offerte' : 'un cadeau offert'}
+                                </strong>.
+                              </Text>
+                              <Text variant="bodyMd">
+                                Avec un panier simulé à <strong>42,00 €</strong>, il manque{" "}
+                                <strong>{Math.max(0, settings.offer2_threshold - 42).toFixed(2)} €</strong>.
+                              </Text>
+                            </BlockStack>
+                          </Banner>
+                        </Box>
+                        
+                        <Box paddingBlockStart="4">
+                          <InlineStack gap="3">
+                            <Button
+                              primary
+                              onClick={handleSubmit}
+                              loading={isSubmitting}
+                            >
+                              Enregistrer uniquement l'offre 2
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setSettings(prev => ({
+                                  ...prev,
+                                  enable_offer2: false,
+                                  offer2_type: "gift",
+                                  offer2_threshold: 75,
+                                  offer2_text_before: "Encore [amount_left]€ pour obtenir l'offre 2",
+                                  offer2_text_after: "Offre 2 activée !",
+                                  offer2_product_url: ""
+                                }));
+                              }}
+                            >
+                              Réinitialiser l'offre 2
+                            </Button>
+                          </InlineStack>
+                        </Box>
+                      </FormLayout>
+                    </BlockStack>
+                  )}
+                  </Box>
+                </Card>
+              </div>
+            </Layout.Section>
+
+            {/* Offre 3 */}
+            <Layout.Section>
+              <div id="offer-3">
+                <Card>
+                  <Box padding="5">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <Text variant="headingMd" fontWeight="bold">Offre 3</Text>
                     <div 
                       style={{
                         width: '44px',
@@ -819,63 +969,145 @@ export default function OffersSettings() {
                       }}></div>
                     </div>
                   </div>
-                </div>
-                
-                <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange}>
-                  <Box padding="4">
-                    <Form method="post" onSubmit={handleSubmit}>
-                      {selectedTab === 0 && (
-                        <OfferForm
-                          index={0}
-                          settings={settings}
-                          onChange={handleSettingChange}
+                  
+                  {settings.enable_offer3 && (
+                    <Box paddingBlockEnd="4">
+                      <Text variant="bodyMd" color="subdued" fontStyle="italic">
+                        {settings.offer3_type === 'shipping' 
+                          ? `Livraison offerte dès ${settings.offer3_threshold}€`
+                          : `Cadeau offert dès ${settings.offer3_threshold}€`
+                        }
+                      </Text>
+                    </Box>
+                  )}
+                  
+                  {settings.enable_offer3 && (
+                    <BlockStack gap="5">
+                      <FormLayout>
+                        <Select
+                          label="Type d'offre"
+                          options={[
+                            { label: "Livraison offerte", value: "shipping" },
+                            { label: "Cadeau offert", value: "gift" }
+                          ]}
+                          value={settings.offer3_type}
+                          onChange={(value) => handleSettingChange('offer3_type', value)}
                         />
-                      )}
-                      {selectedTab === 1 && (
-                        <OfferForm
-                          index={1}
-                          settings={settings}
-                          onChange={handleSettingChange}
+                        
+                        <TextField
+                          label="Seuil (TTC, en €)"
+                          type="number"
+                          value={String(settings.offer3_threshold)}
+                          onChange={(value) => handleSettingChange('offer3_threshold', value)}
+                          placeholder="100,00"
+                          helpText="Exemple : 100,00 €"
                         />
-                      )}
-                      {selectedTab === 2 && (
-                        <OfferForm
-                          index={2}
-                          settings={settings}
-                          onChange={handleSettingChange}
-                        />
-                      )}
-                      
-                      <Box paddingBlockStart="4">
-                        <InlineStack gap="2">
-                          <Button
-                            submit
-                            primary
-                            loading={isSubmitting}
-                          >
-                            Enregistrer cette offre
-                          </Button>
-                          <Button
-                            onClick={handleSubmit}
-                            loading={isSubmitting}
-                          >
-                            Enregistrer toutes les offres
-                          </Button>
-                        </InlineStack>
-                      </Box>
-                    </Form>
+                        
+                        {settings.offer3_type === "gift" && (
+                          <TextField
+                            label="Produit à offrir"
+                            value={settings.offer3_product_url}
+                            onChange={(value) => handleSettingChange('offer3_product_url', value)}
+                            placeholder="Sélectionner un produit"
+                            helpText="Ce produit sera automatiquement ajouté au panier lorsque le seuil est atteint."
+                          />
+                        )}
+                        
+                        <Box paddingBlockStart="3">
+                          <Text variant="headingSm" color="subdued">Messages affichés</Text>
+                          <Box paddingBlockStart="3">
+                            <BlockStack gap="4">
+                              <TextField
+                                label="Avant activation"
+                                value={settings.offer3_text_before}
+                                onChange={(value) => handleSettingChange('offer3_text_before', value)}
+                                multiline={2}
+                                helpText="Utilisez [amount_left] pour afficher le montant restant"
+                              />
+                              
+                              <TextField
+                                label="Après activation"
+                                value={settings.offer3_text_after}
+                                onChange={(value) => handleSettingChange('offer3_text_after', value)}
+                                multiline={2}
+                              />
+                            </BlockStack>
+                          </Box>
+                        </Box>
+                        
+                        <Box paddingBlockStart="3">
+                          <Banner status="info">
+                            <BlockStack gap="2">
+                              <Text variant="bodyMd">
+                                <strong>Aperçu :</strong>
+                              </Text>
+                              <Text variant="bodyMd">
+                                À <strong>{settings.offer3_threshold}€</strong>, le client bénéficie de{" "}
+                                <strong>
+                                  {settings.offer3_type === 'shipping' ? 'la livraison offerte' : 'un cadeau offert'}
+                                </strong>.
+                              </Text>
+                              <Text variant="bodyMd">
+                                Avec un panier simulé à <strong>42,00 €</strong>, il manque{" "}
+                                <strong>{Math.max(0, settings.offer3_threshold - 42).toFixed(2)} €</strong>.
+                              </Text>
+                            </BlockStack>
+                          </Banner>
+                        </Box>
+                        
+                        <Box paddingBlockStart="4">
+                          <InlineStack gap="3">
+                            <Button
+                              primary
+                              onClick={handleSubmit}
+                              loading={isSubmitting}
+                            >
+                              Enregistrer uniquement l'offre 3
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setSettings(prev => ({
+                                  ...prev,
+                                  enable_offer3: false,
+                                  offer3_type: "gift",
+                                  offer3_threshold: 100,
+                                  offer3_text_before: "Encore [amount_left]€ pour obtenir l'offre 3",
+                                  offer3_text_after: "Offre 3 activée !",
+                                  offer3_product_url: ""
+                                }));
+                              }}
+                            >
+                              Réinitialiser l'offre 3
+                            </Button>
+                          </InlineStack>
+                        </Box>
+                      </FormLayout>
+                    </BlockStack>
+                  )}
                   </Box>
-                </Tabs>
-              </Box>
-            </Collapsible>
-          </Card>
-        </Layout.Section>
-        
-        {/* Guide de personnalisation */}
-        <Layout.Section>
-          <CustomizationGuide />
-        </Layout.Section>
-      </Layout>
-    </Page>
+                </Card>
+              </div>
+            </Layout.Section>
+          </Layout>
+        </Page>
+      </div>
+
+      {/* Barre de sauvegarde persistante */}
+      {isDirty() && (
+        <ContextualSaveBar
+          message="Vous avez des modifications non enregistrées"
+          saveAction={{
+            content: 'Enregistrer toutes les offres',
+            onAction: handleSubmit,
+            loading: isSubmitting,
+          }}
+          discardAction={{
+            content: 'Annuler les modifications',
+            onAction: handleCancel,
+            disabled: isSubmitting,
+          }}
+        />
+      )}
+    </Frame>
   );
 }

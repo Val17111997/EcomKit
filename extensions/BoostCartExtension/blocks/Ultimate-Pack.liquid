@@ -646,10 +646,11 @@ enhanceMobile();
     {
       "type": "color",
       "id": "cta_color",
-      "label": "Couleur du CTA",
+      "label": "Couleur d'accent",
+      "info": "Impacte le CTA et les badges/états de paliers",
       "default": "#662d91"
     },
-{
+    {
       "type": "header",
       "content": "Configuration des paliers"
     },
@@ -675,12 +676,13 @@ enhanceMobile();
     },
     {
       "type": "header",
-      "content": "Paliers & Quantités"
+      "content": "Éligibilité du pack (minimum requis)"
     },
     {
       "type": "number",
       "id": "tier1_threshold",
-      "label": "Quantité palier 1",
+      "label": "Minimum X produits",
+      "info": "Aucune remise à ce palier",
       "default": 3
     },
     {
@@ -697,19 +699,21 @@ enhanceMobile();
     },
     {
       "type": "header",
-      "content": "Labels"
+      "content": "Paliers avec remises"
     },
     {
       "type": "text",
       "id": "tier2_label",
-      "label": "Label palier 2",
-      "default": "10%"
+      "label": "Remise palier 2 (%)",
+      "info": "Entrez un nombre (10 = 10%)",
+      "default": "10"
     },
     {
       "type": "text",
       "id": "tier3_label",
-      "label": "Label palier 3",
-      "default": "20%"
+      "label": "Remise palier 3 (%)",
+      "info": "Entrez un nombre (10 = 10%)",
+      "default": "20"
     },
     {
       "type": "header",
@@ -717,7 +721,7 @@ enhanceMobile();
     },
     {
       "type": "paragraph",
-      "content": "Le paramétrage des codes promos se gère directement dans la partie \"Réductions\" sur Shopify. Créez vos codes de réduction là-bas et ils s'appliqueront dans le pack."
+      "content": "Le paramétrage des codes promos se gère directement dans la partie \"Réductions\" sur Shopify. Créez vos codes de réduction là-bas et ils s'appliqueront dans le pack. Note : les paliers n'activent pas de code automatiquement."
     },
     {
       "type": "number",

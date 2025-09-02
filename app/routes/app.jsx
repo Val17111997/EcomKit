@@ -61,12 +61,10 @@ export default function App() {
     <AppProvider isEmbeddedApp apiKey={apiKey}>
       <NavMenu>
         <Link to="/app" rel="home">Home</Link>
-        <Link to="/app/offers-settings">Set-up BoostCart</Link>
-        <Link to="/app/setup-bundlecard">Set-up Bundle-Card</Link>
-        <Link to="/app/setup-ultimatepack">Set-up Ultimate Pack</Link>
-        <Link to="/app/setup-packbuilder">Set-up Pack Builder</Link>
-        <Link to="/app/support">Support client</Link>
-        <Link to="/app/billing">Votre abonnement</Link>
+        <Link to="/app/offers-settings"> 🛒 Panier BoostCart</Link>
+        <Link to="/app/guides">📘 Guides d'installation</Link>
+        <Link to="/app/support">💬 Support client</Link>
+        <Link to="/app/billing">💳 Votre abonnement</Link>
       </NavMenu>
       
       {confirmationUrl ? (
