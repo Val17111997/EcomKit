@@ -77,41 +77,69 @@
             await new Promise(resolve => setTimeout(resolve, 500));
           }
           
-          // Forcer la mise à jour du drawer avant de l'ouvrir
-          const drawerResponse = await fetch(`${window.Shopify?.routes?.root || ''}?section_id=cart-drawer`);
-          if (drawerResponse.ok) {
-            const drawerHTML = await drawerResponse.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(drawerHTML, 'text/html');
-            const newDrawer = doc.querySelector('cart-drawer');
-            const currentDrawer = document.querySelector('cart-drawer');
-            
-            if (newDrawer && currentDrawer) {
-              currentDrawer.innerHTML = newDrawer.innerHTML;
-              currentDrawer.className = newDrawer.className;
+          // Forcer la mise à jour du drawer avant de l'ouvrir (pour les thèmes qui le supportent)
+          try {
+            const drawerResponse = await fetch(`${window.Shopify?.routes?.root || ''}?section_id=cart-drawer`);
+            if (drawerResponse.ok) {
+              const drawerHTML = await drawerResponse.text();
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(drawerHTML, 'text/html');
+              const newDrawer = doc.querySelector('cart-drawer');
+              const currentDrawer = document.querySelector('cart-drawer');
+              
+              if (newDrawer && currentDrawer) {
+                currentDrawer.innerHTML = newDrawer.innerHTML;
+                currentDrawer.className = newDrawer.className;
+              }
             }
+          } catch (e) {
+            console.log('Mise à jour du drawer non supportée');
           }
           
-          // Maintenant ouvrir le drawer
+          // Attendre un peu et ouvrir le drawer
           await new Promise(resolve => setTimeout(resolve, 200));
           
+          // Pour Impact : utiliser directement le sélecteur qui fonctionne
+          const cartLink = document.querySelector('[href="/cart"]');
+          if (cartLink) {
+            console.log('Ouverture du drawer via [href="/cart"]');
+            cartLink.click();
+            return;
+          }
+          
+          // Fallback pour les autres thèmes
           const drawerEl = document.querySelector('cart-drawer');
           if (drawerEl && typeof drawerEl.open === 'function') {
             drawerEl.open();
-          } else {
-            // Essayer les autres méthodes d'ouverture
-            const triggers = ['[data-action="toggle-cart-drawer"]','[aria-controls="CartDrawer"]','[data-cart-toggle]','.header__icon--cart'];
-            for (const sel of triggers) {
-              const btn = document.querySelector(sel);
-              if (btn) {
-                btn.click();
-                break;
-              }
+            return;
+          }
+          
+          // Autres sélecteurs en fallback
+          const otherTriggers = [
+            '[data-action="toggle-cart-drawer"]',
+            '[aria-controls="CartDrawer"]',
+            '[data-cart-toggle]',
+            '.header__icon--cart',
+            '.cart-link',
+            '.cart-icon',
+            '.cart-count-bubble'
+          ];
+          
+          for (const sel of otherTriggers) {
+            const btn = document.querySelector(sel);
+            if (btn) {
+              console.log(`Ouverture du drawer via: ${sel}`);
+              btn.click();
+              return;
             }
           }
+          
+          // Si rien ne fonctionne, rediriger
+          console.log('Aucun trigger trouvé, redirection vers /cart');
+          window.location.href = '/cart';
+          
         } catch (error) {
           console.log('Erreur lors de l\'ouverture du drawer:', error);
-          // En cas d'erreur, rediriger vers le panier
           window.location.href = '/cart';
         }
       }
