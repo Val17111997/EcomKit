@@ -193,7 +193,31 @@
         const nativeButtons=document.querySelectorAll('form[action*="/cart/add"] button[type="submit"], form[action*="/cart/add"] button[name="add"], .product-form__submit, button.product-form__cart-submit');
         nativeButtons.forEach(b=>setButtonLoading(b,true));
 
-        fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:packVariantId,quantity:1,properties:props})})
+        // SOLUTION: Ajouter chaque variante séparément pour avoir des SKUs distincts
+        const itemsToAdd = [];
+        const packId = Date.now().toString();
+        
+        // Ajouter chaque variante sélectionnée comme une ligne séparée
+        form.querySelectorAll('.bundle-buttons').forEach((wrap,idx)=>{
+          const hidden=wrap.querySelector('.bundle-hidden-input');
+          if(hidden.value){
+            const active=wrap.querySelector('.bundle-option-button.active');
+            if(active){
+              itemsToAdd.push({
+                id: parseInt(hidden.value), // ID de la variante spécifique - chaque SKU sera distinct
+                quantity: 1,
+                properties: {
+                  '_pack_group': `Pack ${packId}`, // Grouper visuellement dans le panier
+                  '_pack_name': "{{ block.settings.bundle_heading }}",
+                  '_pack_item': `${variantTitle} ${idx+1}`,
+                  '_selection': active.textContent.trim()
+                }
+              });
+            }
+          }
+        });
+
+        fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:itemsToAdd})})
         .then(r=>r.json())
         .then((result)=>{
           if (result.status === 422 || result.message) {
