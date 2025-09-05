@@ -63,16 +63,56 @@
         }
       }
 
-      const drawerTriggers=['[data-action="toggle-cart-drawer"]','[aria-controls="CartDrawer"]','[data-cart-toggle]','.header__icon--cart'];
-      function openCartDrawer(){
-        const drawerEl=document.querySelector('cart-drawer');
-        if(drawerEl&&typeof drawerEl.open==='function'){
-          const cd=document.querySelector('#my-cart-drawer,[role="dialog"][aria-label*="anier"],cart-drawer'); if(cd) cd.removeAttribute('aria-hidden');
-          return drawerEl.open();
-        }
-        for(const sel of drawerTriggers){
-          const btn=document.querySelector(sel);
-          if(btn){ const cd=document.querySelector('#my-cart-drawer,[role="dialog"][aria-label*="anier"],cart-drawer'); if(cd) cd.removeAttribute('aria-hidden'); btn.click(); return; }
+      async function openCartDrawerWithRetry(){
+        // Attendre que le panier soit mis à jour côté serveur
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Récupérer les données actuelles du panier pour vérifier
+        try {
+          const cartResponse = await fetch('/cart.js');
+          const cartData = await cartResponse.json();
+          
+          if (cartData.item_count === 0) {
+            // Si le panier est encore vide, attendre encore
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          
+          // Forcer la mise à jour du drawer avant de l'ouvrir
+          const drawerResponse = await fetch(`${window.Shopify?.routes?.root || ''}?section_id=cart-drawer`);
+          if (drawerResponse.ok) {
+            const drawerHTML = await drawerResponse.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(drawerHTML, 'text/html');
+            const newDrawer = doc.querySelector('cart-drawer');
+            const currentDrawer = document.querySelector('cart-drawer');
+            
+            if (newDrawer && currentDrawer) {
+              currentDrawer.innerHTML = newDrawer.innerHTML;
+              currentDrawer.className = newDrawer.className;
+            }
+          }
+          
+          // Maintenant ouvrir le drawer
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          const drawerEl = document.querySelector('cart-drawer');
+          if (drawerEl && typeof drawerEl.open === 'function') {
+            drawerEl.open();
+          } else {
+            // Essayer les autres méthodes d'ouverture
+            const triggers = ['[data-action="toggle-cart-drawer"]','[aria-controls="CartDrawer"]','[data-cart-toggle]','.header__icon--cart'];
+            for (const sel of triggers) {
+              const btn = document.querySelector(sel);
+              if (btn) {
+                btn.click();
+                break;
+              }
+            }
+          }
+        } catch (error) {
+          console.log('Erreur lors de l\'ouverture du drawer:', error);
+          // En cas d'erreur, rediriger vers le panier
+          window.location.href = '/cart';
         }
       }
 
@@ -113,7 +153,12 @@
             ok=false; return false;
           }
           const active=wrap.querySelector('.bundle-option-button.active');
-          if(active){ const text=active.textContent.trim(); props[`${variantTitle} ${idx+1}`]=text; props[`variant_id_${idx+1}`]=active.dataset.variantId; }
+          if(active){ 
+            const text=active.textContent.trim(); 
+            props[`${variantTitle} ${idx+1}`]=text;
+            // Retirer cette ligne qui ajoute l'ID de variante visible :
+            // props[`variant_id_${idx+1}`]=active.dataset.variantId; 
+          }
         });
         if(!ok) return false;
 
@@ -121,14 +166,24 @@
         nativeButtons.forEach(b=>setButtonLoading(b,true));
 
         fetch('/cart/add.js',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:packVariantId,quantity:1,properties:props})})
-        .then(r=>typeof r.json==='function'?r.json():r)
-        .then(()=>{
+        .then(r=>r.json())
+        .then((result)=>{
+          if (result.status === 422 || result.message) {
+            throw new Error(result.message || result.description || 'Erreur lors de l\'ajout');
+          }
           showToast('✓ Pack ajouté au panier avec succès !','success');
           form.classList.add('bundle-success'); setTimeout(()=>form.classList.remove('bundle-success'),1000);
-          setTimeout(openCartDrawer,500);
+          
+          // Utiliser la nouvelle fonction avec retry
+          openCartDrawerWithRetry();
         })
-        .catch(err=>{ console.error('Erreur complète:',err); showToast(`Erreur lors de l'ajout : ${err.message||err}`,'error'); })
-        .finally(()=>{ nativeButtons.forEach(b=>setButtonLoading(b,false)); });
+        .catch(err=>{ 
+          console.error('Erreur complète:',err); 
+          showToast(`Erreur lors de l'ajout : ${err.message||err}`,'error'); 
+        })
+        .finally(()=>{ 
+          nativeButtons.forEach(b=>setButtonLoading(b,false)); 
+        });
 
         return false;
       }
@@ -204,8 +259,8 @@
   "name":"Pack-Builder",
   "target":"section",
   "settings":[
-    { "type":"product","id":"pack_product","label":"Produit principal (pack découverte)","info":"Sélectionnez le produit (les variantes s’affichent). Le nombre de cases dépend du réglage « Taille du pack »." },
-    { "type":"range","id":"pack_size","label":"Taille du pack (nombre d’articles à sélectionner)","min":1,"max":12,"step":1,"default":3 },
+    { "type":"product","id":"pack_product","label":"Produit principal (pack découverte)","info":"Sélectionnez le produit (les variantes s'affichent). Le nombre de cases dépend du réglage « Taille du pack »." },
+    { "type":"range","id":"pack_size","label":"Taille du pack (nombre d'articles à sélectionner)","min":1,"max":12,"step":1,"default":3 },
     { "type":"text","id":"bundle_heading","label":"Titre du pack (Heading)","default":"Composez votre pack :" },
     { "type":"text","id":"variant_title","label":"Titre de la variante","default":"Produit","info":"Titre affiché pour chaque sélection (ex: Produit, Complément, Supplément...)" },
     { "type":"text","id":"validation_message","label":"Message validation absence variant","default":"Veuillez sélectionner une variante" },
