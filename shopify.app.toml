@@ -7,7 +7,6 @@ application_url = "https://ecomkit.fly.dev"
 embedded = true
 
 [build]
-include_config_on_deploy = true
 automatically_update_urls_on_dev = true
 
 [webhooks]
@@ -34,9 +33,9 @@ scopes = "write_products,read_products,read_orders,read_customers,write_payment_
 
 [auth]
 redirect_urls = [
-  "https://ecomkit.fly.dev/auth/callback",
-  "https://ecomkit.fly.dev/auth/shopify/callback",
-  "https://ecomkit.fly.dev/api/auth/callback"
+  "https://ecomkit.fly.dev/webhooks/customers/data_request",
+  "https://ecomkit.fly.dev/webhooks/customers/redact",
+  "https://ecomkit.fly.dev/webhooks/shop/redact"
 ]
 
 [pos]
