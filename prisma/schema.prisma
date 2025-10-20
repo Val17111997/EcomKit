@@ -38,13 +38,18 @@ model UsageSubscription {
   @@index([shop])
 }
 
-model UsageBillingState {
-  id           Int     @id @default(autoincrement())
-  shop         String
-  periodKey    String
-  billedTier   Int     @default(0)   // 0: <=30, 1: 31–300, 2: >300
-  billedAmount Float   @default(0)
-  lastIdemKey  String? @unique
+model usageBillingState {
+  id               Int       @id @default(autoincrement())
+  shop             String
+  periodKey        String
+  billedTier       Int       @default(0)
+  billedAmount     Float     @default(0)
+  lastIdemKey      String?
+
+  // 🔽 AJOUTE CES 2 LIGNES ICI
+  processingToken  String?   // sert à bloquer les doubles facturations
+  lastProcessedAt  DateTime? // utilisé pour le throttle anti-spam
 
   @@unique([shop, periodKey])
 }
+
