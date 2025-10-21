@@ -320,7 +320,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
         return { ...usage, orderCount };
       }
     } else {
-      console.warn("[USAGE] ⚠️ Aucun line item d’usage trouvé sur la souscription ACTIVE");
+      console.warn("[USAGE] ⚠️ Aucun line item d'usage trouvé sur la souscription ACTIVE");
     }
   } catch (e) {
     console.warn("[USAGE] ⚠️ Lecture cap/cycle impossible, tentative delta brut:", e?.message);
@@ -425,16 +425,12 @@ export async function ensureActiveSubscription(admin, shop) {
         data: { status: "CANCELLED", confirmationUrl: null },
       });
 
-      // Si pas en essai → process usage sur le cycle courant
-      if (!isInTrial(activeShopify)) {
-        const dbUsage = await prisma.usageSubscription.findFirst({
-          where: { shop, subscriptionId: activeShopify.id },
-        });
-        const resProcess = await processMonthlyUsage(admin, shop, dbUsage);
-        return { active: true, orderCount: resProcess?.orderCount ?? null };
-      }
-      console.log("[SUBSCRIPTION] Essai en cours – pas de processMonthlyUsage.");
-      return { active: true, orderCount: null };
+      // ✅ CORRECTION : Toujours compter pour l'UI ; processMonthlyUsage ne facture pas si essai
+      const dbUsage = await prisma.usageSubscription.findFirst({
+        where: { shop, subscriptionId: activeShopify.id },
+      });
+      const resProcess = await processMonthlyUsage(admin, shop, dbUsage);
+      return { active: true, orderCount: resProcess?.orderCount ?? null };
     }
   } catch (err) {
     console.error("Erreur check live subscription Shopify:", err);
@@ -465,6 +461,7 @@ export async function ensureActiveSubscription(admin, shop) {
           where: { shop, id: { not: pending.id } },
           data: { status: "CANCELLED", confirmationUrl: null },
         });
+        // ✅ CORRECTION : Appel systématique même pendant l'essai
         const resProcess = await processMonthlyUsage(admin, shop, pending);
         return { active: true, orderCount: resProcess?.orderCount ?? null };
       }
