@@ -108,6 +108,24 @@ async function releaseLock(shop, periodKey, token) {
   });
 }
 
+/* ----------------------------- NEW: Trial Tracking ----------------------------- */
+
+/**
+ * Vérifie si la boutique a déjà consommé son essai gratuit
+ * En cherchant n'importe quel ancien abonnement avec trialConsumed=true
+ */
+async function hasConsumedTrial(shop) {
+  const anyConsumedTrial = await prisma.usageSubscription.findFirst({
+    where: { 
+      shop,
+      trialConsumed: true, // ✅ Cherche explicitement si un essai a été consommé
+    },
+    orderBy: { id: "desc" },
+  });
+  
+  return !!anyConsumedTrial;
+}
+
 /* --------------------------- processMonthlyUsage --------------------------- */
 /**
  * Compte et facture l'usage sur le **cycle Shopify courant (30 jours)**.
@@ -238,68 +256,68 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
     return { ...usage, orderCount };
   }
 
+  // ✅ Calculer le delta entre paliers (pas billedAmount pour éviter erreurs sur clamp)
   const delta = TIERS[currentTier].price - TIERS[state.billedTier].price;
-  if (delta <= 0) return { ...usage, orderCount };
-
-  // Idempotence
-  const idemKey = `${shop}:${periodKey}:${state.billedTier}->${currentTier}`;
-  if (state.lastIdemKey === idemKey) return { ...usage, orderCount };
-
-  // Lock + throttle
-  const lock = await tryAcquireLock(shop, periodKey);
-  if (!lock.acquired) {
-    console.log(`[USAGE] 🔒 Skip facturation (raison: ${lock.reason}) – anti-doublon.`);
+  const idemKey = `${periodKey}:${currentTier}`;
+  if (state.lastIdemKey === idemKey) {
+    console.log("[USAGE] ⏭ Déjà facturé ce palier ce cycle, skip");
     return { ...usage, orderCount };
   }
 
-  // ==== 3) Clamp au cap restant **du CYCLE**
+  // ==== 3) Lock + throttle (anti-doublon)
+  const lock = await tryAcquireLock(shop, periodKey, 2 * 60 * 1000);
+  if (!lock.acquired) {
+    console.log("[USAGE] ⏸ Lock occupé ou throttle, skip");
+    return { ...usage, orderCount };
+  }
+
+  // ==== 3b) Récupérer cycle cap & usage total déjà facturé
   let toBill = delta;
   try {
-    const subRes = await admin.graphql(`#graphql
-      query {
-        currentAppInstallation {
-          activeSubscriptions {
-            status
-            # on réutilise createdAt/currentPeriodEnd pour borner le cycle
-            createdAt
-            currentPeriodEnd
-            lineItems {
-              id
-              plan {
-                pricingDetails {
-                  __typename
-                  ... on AppUsagePricing {
-                    cappedAmount { amount currencyCode }
-                    terms
-                  }
-                }
-              }
-              usageRecords(first: 100, reverse: true) {
-                edges { node { createdAt price { amount } } }
-              }
-            }
-          }
-        }
-      }
-    `);
-    const subJson = await subRes.json();
-    const active = subJson?.data?.currentAppInstallation?.activeSubscriptions?.find(
-      (s) => s.status === "ACTIVE"
+    const subLineQuery = await admin.graphql(
+      `#graphql
+       query($id: ID!) {
+         node(id: $id) {
+           ... on AppSubscription {
+             id
+             status
+             createdAt
+             currentPeriodEnd
+             lineItems {
+               id
+               plan {
+                 pricingDetails {
+                   ... on AppUsagePricing {
+                     balanceUsed { amount }
+                     cappedAmount { amount }
+                     interval
+                   }
+                 }
+               }
+               usageRecords(first: 100, sortKey: CREATED_AT, reverse: true) {
+                 edges {
+                   node {
+                     id
+                     createdAt
+                     price { amount }
+                   }
+                 }
+               }
+             }
+           }
+         }
+       }`,
+      { variables: { id: activeSub.id } }
     );
-    const usageItem = active?.lineItems?.find(
-      (li) => li?.plan?.pricingDetails?.__typename === "AppUsagePricing"
-    );
+    const lineJson = await subLineQuery.json();
+    const subNode = lineJson?.data?.node;
+    const item = subNode?.lineItems?.[0];
 
-    if (usageItem?.plan?.pricingDetails?.cappedAmount?.amount != null) {
-      const capped = Number(usageItem.plan.pricingDetails.cappedAmount.amount);
+    if (item) {
+      const capped = Number(item.plan?.pricingDetails?.cappedAmount?.amount || 0);
+      const { cycleStart: cStart, cycleEnd: cEnd } = getCurrentCycleWindow(subNode, now);
 
-      // borne cycle
-      const { cycleStart: cStart, cycleEnd: cEnd } = getCurrentCycleWindow(
-        { createdAt: active.createdAt, currentPeriodEnd: active.currentPeriodEnd },
-        now
-      );
-
-      const usedThisCycle = (usageItem.usageRecords?.edges ?? [])
+      const usedThisCycle = (item.usageRecords?.edges || [])
         .filter((e) => {
           const d = new Date(e.node.createdAt);
           return d >= cStart && d < cEnd;
@@ -391,7 +409,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
 
 /* ------------------------ ensureActiveSubscription ------------------------ */
 /**
- * Assure une souscription ACTIVE (usage-only, cap 39,90€) + essai 7 jours.
+ * Assure une souscription ACTIVE (usage-only, cap 39,90€) + essai 7 jours UNIQUEMENT pour les nouveaux clients.
  */
 export async function ensureActiveSubscription(admin, shop) {
   try {
@@ -404,6 +422,10 @@ export async function ensureActiveSubscription(admin, shop) {
         (li) => li.plan?.pricingDetails?.__typename === "AppUsagePricing"
       );
 
+      // ✅ Déterminer si l'essai est encore actif ou consommé
+      const stillInTrial = isInTrial(activeShopify);
+      const trialConsumed = !stillInTrial; // Si plus en essai → essai consommé
+
       await prisma.usageSubscription.upsert({
         where: { subscriptionId: activeShopify.id },
         update: {
@@ -411,12 +433,14 @@ export async function ensureActiveSubscription(admin, shop) {
           confirmationUrl: null,
           lineItemId: usageItem?.id ?? activeShopify.lineItems?.[0]?.id ?? null,
           shop,
+          trialConsumed, // ✅ Marque l'essai comme consommé si terminé
         },
         create: {
           shop,
           subscriptionId: activeShopify.id,
           lineItemId: usageItem?.id ?? activeShopify.lineItems?.[0]?.id ?? null,
           status: "ACTIVE",
+          trialConsumed, // ✅ Marque l'essai comme consommé dès la création si pas en trial
         },
       });
 
@@ -453,9 +477,44 @@ export async function ensureActiveSubscription(admin, shop) {
       const status = checkJson?.data?.node?.status;
 
       if (status === "ACTIVE") {
+        // ✅ Récupérer les détails complets pour lineItemId + trial status
+        const checkDetails = await admin.graphql(
+          `#graphql
+           query($id: ID!) { 
+             node(id: $id) { 
+               ... on AppSubscription { 
+                 status 
+                 trialDays
+                 createdAt
+                 lineItems { 
+                   id 
+                   plan { 
+                     pricingDetails { __typename } 
+                   } 
+                 }
+               } 
+             } 
+           }`,
+          { variables: { id: pending.subscriptionId } }
+        );
+        const detailsJson = await checkDetails.json();
+        const subDetails = detailsJson?.data?.node;
+        const stillInTrial = subDetails ? isInTrial(subDetails) : false;
+        
+        // ✅ Trouver le lineItemId d'usage (au cas où il aurait changé entre PENDING et ACTIVE)
+        const usageItem = subDetails?.lineItems?.find(
+          (li) => li.plan?.pricingDetails?.__typename === "AppUsagePricing"
+        );
+        const freshLineItemId = usageItem?.id ?? subDetails?.lineItems?.[0]?.id ?? pending.lineItemId;
+        
         await prisma.usageSubscription.update({
           where: { id: pending.id },
-          data: { status: "ACTIVE", confirmationUrl: null },
+          data: { 
+            status: "ACTIVE", 
+            confirmationUrl: null,
+            lineItemId: freshLineItemId, // ✅ Rafraîchir au cas où changé
+            trialConsumed: !stillInTrial, // ✅ Marque comme consommé si plus en essai
+          },
         });
         await prisma.usageSubscription.updateMany({
           where: { shop, id: { not: pending.id } },
@@ -479,16 +538,22 @@ export async function ensureActiveSubscription(admin, shop) {
     });
   }
 
-  // Créer une SOUSCRIPTION usage-only (cap 39,90€, essai 7 jours)
+  // ✅ CORRECTION MAJEURE : Vérifier si la boutique a déjà consommé son essai
+  const alreadyConsumed = await hasConsumedTrial(shop);
+  const trialDays = alreadyConsumed ? 0 : 7; // Essai uniquement si jamais consommé
+  
+  console.log(`[SUBSCRIPTION] Création nouvel abonnement - Essai: ${trialDays} jours ${alreadyConsumed ? '(déjà consommé)' : '(nouveau client)'}`);
+
+  // Créer une SOUSCRIPTION usage-only (cap 39,90€, essai 7 jours UNIQUEMENT si jamais consommé)
   try {
     const returnUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
     const result = await admin.graphql(
       `#graphql
-      mutation createSub($returnUrl: URL!) {
+      mutation createSub($returnUrl: URL!, $trialDays: Int!) {
         appSubscriptionCreate(
           name: "Abonnement commandes (usage-only)"
           returnUrl: $returnUrl
-          trialDays: 7
+          trialDays: $trialDays
           lineItems: [
             {
               plan: {
@@ -509,7 +574,7 @@ export async function ensureActiveSubscription(admin, shop) {
           userErrors { field message }
         }
       }`,
-      { variables: { returnUrl } }
+      { variables: { returnUrl, trialDays } }
     );
 
     const data = await result.json();
@@ -531,6 +596,7 @@ export async function ensureActiveSubscription(admin, shop) {
         lineItemId: usageItem?.id ?? sub.lineItems?.[0]?.id ?? null,
         status: "PENDING",
         confirmationUrl: payload.confirmationUrl,
+        trialConsumed: trialDays === 0, // ✅ Si pas d'essai, déjà consommé
       },
     });
 

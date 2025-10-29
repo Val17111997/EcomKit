@@ -34,6 +34,7 @@ model UsageSubscription {
   orderCount      Int       @default(0)
   cycleStart      DateTime?           // <- optionnel
   confirmationUrl String?
+  trialConsumed    Boolean   @default(false)
 
   @@index([shop])
 }
