@@ -5,7 +5,8 @@ import crypto from "crypto";
 /* ----------------------------- helpers trial ----------------------------- */
 
 async function getActiveSubscription(admin) {
-  const res = await admin.graphql(`#graphql
+  // ✅ Fonction helper pour construire la query avec ou sans le champ test
+  const buildQuery = (withTest) => `#graphql
     query {
       currentAppInstallation {
         activeSubscriptions {
@@ -13,20 +14,52 @@ async function getActiveSubscription(admin) {
           status
           trialDays
           createdAt
-          # currentPeriodEnd n'est pas garanti sur toutes les versions;
-          # on l'utilise si dispo, sinon on calcule depuis createdAt.
           currentPeriodEnd
-          lineItems { id plan { pricingDetails { __typename } } }
+          ${withTest ? "test" : ""}
+          lineItems { 
+            id 
+            plan { 
+              pricingDetails { 
+                __typename
+                ... on AppUsagePricing {
+                  balanceUsed { amount }
+                  cappedAmount { amount }
+                }
+              } 
+            } 
+          }
         }
       }
     }
-  `);
-  const json = await res.json();
-  return (
-    json?.data?.currentAppInstallation?.activeSubscriptions?.find(
-      (s) => s.status === "ACTIVE"
-    ) || null
-  );
+  `;
+
+  // ✅ Tenter avec le champ test, fallback si non supporté
+  let res = await admin.graphql(buildQuery(true));
+  let json = await res.json();
+  
+  // Si erreur sur le champ test, retry sans
+  if (json?.errors?.some(e => String(e.message).toLowerCase().includes("test"))) {
+    console.log("[SUBSCRIPTION] ⚠️ Champ 'test' non supporté, retry sans ce champ");
+    res = await admin.graphql(buildQuery(false));
+    json = await res.json();
+  }
+  
+  // ✅ Vérifier les erreurs GraphQL
+  if (json?.errors) {
+    console.error("[SUBSCRIPTION] ❌ Erreur GraphQL getActiveSubscription:", json.errors);
+    throw new Error(`GraphQL errors: ${json.errors.map(e => e.message).join(", ")}`);
+  }
+  
+  const active = json?.data?.currentAppInstallation?.activeSubscriptions?.find(
+    (s) => s.status === "ACTIVE"
+  ) || null;
+  
+  // ✅ Si le champ test n'existe pas, on met false par défaut (= production)
+  if (active && typeof active.test === "undefined") {
+    active.test = false;
+  }
+  
+  return active;
 }
 
 function trialEndsAtFrom(sub) {
@@ -38,8 +71,27 @@ function trialEndsAtFrom(sub) {
 }
 
 function isInTrial(activeSub) {
+  // Si pas de trialDays configuré → pas d'essai
+  if (!activeSub?.trialDays || activeSub.trialDays <= 0) return false;
+  
   const ends = trialEndsAtFrom(activeSub);
-  return !!(ends && Date.now() < ends.getTime());
+  if (!ends) return false;
+  
+  const now = Date.now();
+  const inTrial = now < ends.getTime();
+  
+  // ✅ LOG CRUCIAL pour déboguer
+  console.log("[TRIAL DEBUG]", {
+    trialDays: activeSub.trialDays,
+    createdAt: activeSub.createdAt,
+    trialEndsAt: ends.toISOString(),
+    now: new Date(now).toISOString(),
+    inTrial,
+    msRemaining: ends.getTime() - now,
+    daysRemaining: (ends.getTime() - now) / (24 * 60 * 60 * 1000)
+  });
+  
+  return inTrial;
 }
 
 /* -------------------------- helpers cycle (30j) -------------------------- */
@@ -75,7 +127,7 @@ function periodKeyForCycle(cycleStart) {
 /* ---------------------------- helpers lock/throttle ---------------------------- */
 
 // Lock atomique (updateMany conditionnel) + throttle
-async function tryAcquireLock(shop, periodKey, throttleMs = 2 * 60 * 1000) {
+async function tryAcquireLock(shop, periodKey, throttleMs = 30 * 1000) {
   const now = new Date();
   const row = await prisma.usageBillingState.findUnique({
     where: { shop_periodKey: { shop, periodKey } },
@@ -134,6 +186,8 @@ async function hasConsumedTrial(shop) {
  * - Idempotent et anti-doublon.
  */
 export async function processMonthlyUsage(admin, shop, existingUsage) {
+  console.log("[USAGE] 🚀 Début processMonthlyUsage pour", shop);
+  
   let usage =
     existingUsage ||
     (await prisma.usageSubscription.findFirst({
@@ -145,7 +199,10 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
       where: { shop, status: "ACTIVE" },
     });
   }
-  if (!usage) return null;
+  if (!usage) {
+    console.warn("[USAGE] ❌ Aucun usage trouvé pour", shop);
+    return null;
+  }
 
   // ==== Lire la souscription ACTIVE (trial + fenêtre de cycle)
   const activeSub = await getActiveSubscription(admin);
@@ -158,79 +215,40 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   const { cycleStart, cycleEnd } = getCurrentCycleWindow(activeSub, now);
   const periodKey = periodKeyForCycle(cycleStart);
 
-  // STOP si essai
-  if (isInTrial(activeSub)) {
+  // ✅ GUARD: Ignorer les abonnements de test (environnement dev)
+  if (activeSub?.test === true) {
+    console.log("[USAGE] 🧪 Installation de test détectée — skip facturation.");
+    const orderCount = await countOrdersForCycle(admin, cycleStart, cycleEnd);
+    await prisma.usageSubscription.update({
+      where: { id: usage.id },
+      data: { orderCount },
+    });
+    return { ...usage, orderCount };
+  }
+
+  // ✅ CORRECTION CRITIQUE : Vérifier l'essai et ARRÊTER si actif
+  const inTrial = isInTrial(activeSub);
+  if (inTrial) {
     console.log("[USAGE] ⏸ Essai en cours – aucune facturation d'usage.");
+    // ✅ TOUJOURS compter pour l'UI même pendant l'essai
+    const orderCount = await countOrdersForCycle(admin, cycleStart, cycleEnd);
+    await prisma.usageSubscription.update({
+      where: { id: usage.id },
+      data: { orderCount },
+    });
+    return { ...usage, orderCount }; // ✅ ARRÊT ICI - Ne pas facturer
   }
 
   // ==== 1) Compter les commandes sur le CYCLE (shopify-like 30j)
-  let orderCount = 0;
-  try {
-    const startDate = cycleStart.toISOString();
-    const endDate = cycleEnd.toISOString();
-    console.log(`[USAGE] 🚀 Comptage commandes pour cycle ${startDate} → ${endDate}`);
-
-    const queryString = `created_at:>=${startDate} created_at:<=${endDate} -status:cancelled -test:true (financial_status:paid OR financial_status:partially_paid)`;
-
-    const response = await admin.graphql(
-      `#graphql
-        query OrdersCount($query: String!) {
-          orders(first: 250, query: $query) {
-            edges { node { id createdAt } cursor }
-            pageInfo { hasNextPage }
-          }
-        }`,
-      { variables: { query: queryString } }
-    );
-    const json = await response.json();
-    console.log(`[DEBUG] Réponse GraphQL orders reçue`);
-
-    if (json?.data?.orders) {
-      const edges = json.data.orders.edges || [];
-      orderCount = edges.length;
-
-      let hasNextPage = json.data.orders.pageInfo?.hasNextPage;
-      let lastCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
-      while (hasNextPage && lastCursor) {
-        const nextResponse = await admin.graphql(
-          `#graphql
-            query OrdersNext($query: String!, $cursor: String!) {
-              orders(first: 250, after: $cursor, query: $query) {
-                edges { node { id } cursor }
-                pageInfo { hasNextPage }
-              }
-            }`,
-          { variables: { query: queryString, cursor: lastCursor } }
-        );
-        const nextJson = await nextResponse.json();
-        const nextEdges = nextJson?.data?.orders?.edges || [];
-        orderCount += nextEdges.length;
-        hasNextPage = nextJson?.data?.orders?.pageInfo?.hasNextPage;
-        lastCursor =
-          nextEdges.length > 0 ? nextEdges[nextEdges.length - 1].cursor : null;
-      }
-      console.log(`[USAGE] 🎯 TOTAL CYCLE: ${orderCount} commandes`);
-    } else if (json?.errors) {
-      throw new Error(json.errors.map((e) => e.message).join(", "));
-    } else {
-      throw new Error("Réponse GraphQL inattendue (orders)");
-    }
-  } catch (error) {
-    console.error("Erreur comptage automatique:", error.message);
-    orderCount = usage.orderCount || 0;
-    console.warn(`[USAGE] ⚠️ FALLBACK DB: ${orderCount}`);
-  }
+  console.log(`[USAGE] 📊 Comptage commandes pour cycle ${cycleStart.toISOString()} → ${cycleEnd.toISOString()}`);
+  const orderCount = await countOrdersForCycle(admin, cycleStart, cycleEnd);
+  console.log(`[USAGE] 🎯 TOTAL CYCLE: ${orderCount} commandes`);
 
   // Toujours mettre à jour l'UI
   await prisma.usageSubscription.update({
     where: { id: usage.id },
     data: { orderCount },
   });
-
-  // Si essai → s'arrêter ici (aucune mutation de facturation)
-  if (isInTrial(activeSub)) {
-    return { ...usage, orderCount };
-  }
 
   // ==== 2) Logique paliers & delta (sur le CYCLE)
   const TIERS = [
@@ -242,21 +260,19 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
   const currentTier = pickTier(orderCount);
 
   // État de facturation pour CE CYCLE
-  let state = await prisma.usageBillingState.findUnique({
+  let state = await prisma.usageBillingState.upsert({
     where: { shop_periodKey: { shop, periodKey } },
+    update: {}, // Rien à mettre à jour si existe déjà
+    create: { shop, periodKey, billedTier: 0, billedAmount: 0 },
   });
-  if (!state) {
-    state = await prisma.usageBillingState.create({
-      data: { shop, periodKey, billedTier: 0, billedAmount: 0 },
-    });
-  }
 
-  // Si le palier n'a pas augmenté → rien à facturer (pas de régression possible à l'intérieur d'un cycle)
+  // Si le palier n'a pas augmenté → rien à facturer
   if (currentTier <= state.billedTier) {
+    console.log(`[USAGE] ✅ Palier actuel (${currentTier}) <= palier facturé (${state.billedTier}), rien à faire`);
     return { ...usage, orderCount };
   }
 
-  // ✅ Calculer le delta entre paliers (pas billedAmount pour éviter erreurs sur clamp)
+  // ✅ Calculer le delta entre paliers
   const delta = TIERS[currentTier].price - TIERS[state.billedTier].price;
   const idemKey = `${periodKey}:${currentTier}`;
   if (state.lastIdemKey === idemKey) {
@@ -264,15 +280,37 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
     return { ...usage, orderCount };
   }
 
+  console.log(`[USAGE] 💰 Changement de palier détecté: ${state.billedTier} → ${currentTier} (delta: +${delta}€)`);
+
   // ==== 3) Lock + throttle (anti-doublon)
-  const lock = await tryAcquireLock(shop, periodKey, 2 * 60 * 1000);
+  const lock = await tryAcquireLock(shop, periodKey, 30 * 1000);
   if (!lock.acquired) {
-    console.log("[USAGE] ⏸ Lock occupé ou throttle, skip");
+    console.log(`[USAGE] ⏸ Lock non acquis (raison: ${lock.reason}) - skip facturation`);
     return { ...usage, orderCount };
   }
 
-  // ==== 3b) Récupérer cycle cap & usage total déjà facturé
+  // ✅ PURISME: Re-check de l'état après acquisition du lock
+  // (au cas où un autre thread aurait facturé entre-temps)
+  const freshState = await prisma.usageBillingState.findUnique({
+    where: { shop_periodKey: { shop, periodKey } },
+  });
+  
+  if (freshState && freshState.billedTier >= currentTier) {
+    console.log(`[USAGE] ✅ Un autre thread a déjà facturé ce palier (${freshState.billedTier})`);
+    await releaseLock(shop, periodKey, lock.token);
+    return { ...usage, orderCount };
+  }
+  
+  if (freshState && freshState.lastIdemKey === idemKey) {
+    console.log("[USAGE] ⏭ Un autre thread a déjà facturé ce palier+cycle (idemKey match)");
+    await releaseLock(shop, periodKey, lock.token);
+    return { ...usage, orderCount };
+  }
+
+  // ==== 3b) Récupérer cycle cap & usage total déjà facturé + lineItem live
   let toBill = delta;
+  let liveLineItemId = usage.lineItemId; // fallback
+  
   try {
     const subLineQuery = await admin.graphql(
       `#graphql
@@ -294,15 +332,6 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
                    }
                  }
                }
-               usageRecords(first: 100, sortKey: CREATED_AT, reverse: true) {
-                 edges {
-                   node {
-                     id
-                     createdAt
-                     price { amount }
-                   }
-                 }
-               }
              }
            }
          }
@@ -310,42 +339,67 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
       { variables: { id: activeSub.id } }
     );
     const lineJson = await subLineQuery.json();
+    
+    // ✅ Gestion des erreurs GraphQL
+    if (lineJson?.errors) {
+      throw new Error(`GraphQL errors: ${lineJson.errors.map(e => e.message).join(", ")}`);
+    }
+    
     const subNode = lineJson?.data?.node;
-    const item = subNode?.lineItems?.[0];
+    
+    // ✅ Trouver le line item d'usage LIVE
+    const item = subNode?.lineItems?.find(
+      (li) => li.plan?.pricingDetails?.__typename === "AppUsagePricing"
+    ) || subNode?.lineItems?.[0];
 
-    if (item) {
-      const capped = Number(item.plan?.pricingDetails?.cappedAmount?.amount || 0);
-      const { cycleStart: cStart, cycleEnd: cEnd } = getCurrentCycleWindow(subNode, now);
+    if (!item) {
+      console.error("[USAGE] ❌ Aucun line item trouvé - impossible de facturer");
+      await releaseLock(shop, periodKey, lock.token);
+      return { ...usage, orderCount };
+    }
 
-      const usedThisCycle = (item.usageRecords?.edges || [])
-        .filter((e) => {
-          const d = new Date(e.node.createdAt);
-          return d >= cStart && d < cEnd;
-        })
-        .reduce((sum, e) => sum + Number(e.node.price.amount), 0);
+    // ✅ Utiliser le lineItemId LIVE (au cas où il aurait changé)
+    liveLineItemId = item.id;
 
-      const remaining = Math.max(capped - usedThisCycle, 0);
-      toBill = Math.min(Math.max(delta, 0), remaining);
+    const capped = Number(item.plan?.pricingDetails?.cappedAmount?.amount || 0);
+    
+    // ✅ Utiliser balanceUsed directement (plus fiable que pagination des records)
+    const usedThisCycle = Number(item.plan?.pricingDetails?.balanceUsed?.amount || 0);
 
-      if (toBill <= 0) {
-        console.log(
-          "[USAGE] Cap cycle atteint ou rien à facturer | remaining:",
-          remaining,
-          "delta:",
-          delta
-        );
-        await releaseLock(shop, periodKey, lock.token);
-        return { ...usage, orderCount };
-      }
-    } else {
-      console.warn("[USAGE] ⚠️ Aucun line item d'usage trouvé sur la souscription ACTIVE");
+    const remaining = Math.max(capped - usedThisCycle, 0);
+    toBill = Math.min(Math.max(delta, 0), remaining);
+
+    console.log("[USAGE] 📊 Cap info:", {
+      cap: capped,
+      usedThisCycle,
+      remaining,
+      toBill,
+      liveLineItemId
+    });
+
+    if (toBill <= 0) {
+      console.log(
+        "[USAGE] ⚠️ Cap cycle atteint ou rien à facturer | remaining:",
+        remaining,
+        "delta:",
+        delta
+      );
+      await releaseLock(shop, periodKey, lock.token);
+      return { ...usage, orderCount };
     }
   } catch (e) {
-    console.warn("[USAGE] ⚠️ Lecture cap/cycle impossible, tentative delta brut:", e?.message);
+    console.error("[USAGE] ❌ Erreur lecture cap/cycle:", e?.message);
+    // Ne pas tenter de facturer si on ne peut pas lire le cap
+    await releaseLock(shop, periodKey, lock.token);
+    return { ...usage, orderCount };
   }
 
-  // ==== 4) Création usage record (toBill clampé)
+  // ==== 4) Création usage record (toBill clampé et arrondi)
   try {
+    // ✅ Arrondir à 2 décimales pour éviter les problèmes de float
+    const amount = Math.round(toBill * 100) / 100;
+    
+    console.log(`[USAGE] 💳 Création usage record: ${amount.toFixed(2)}€ sur line item ${liveLineItemId}`);
     const resp = await admin.graphql(
       `#graphql
         mutation usage($id: ID!, $price: MoneyInput!, $desc: String!) {
@@ -359,9 +413,9 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
         }`,
       {
         variables: {
-          id: usage.lineItemId,
-          price: { amount: toBill, currencyCode: "EUR" },
-          desc: `Cycle ${periodKey} — tier ${state.billedTier}→${currentTier} (+${toBill.toFixed(
+          id: liveLineItemId, // ✅ Utiliser le lineItemId LIVE
+          price: { amount, currencyCode: "EUR" },
+          desc: `Cycle ${periodKey} — tier ${state.billedTier}→${currentTier} (+${amount.toFixed(
             2
           )}€)`,
         },
@@ -370,7 +424,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
     const respJson = await resp.json();
     const errors = respJson?.data?.appUsageRecordCreate?.userErrors;
     if (errors?.length) {
-      console.error("[USAGE] create error:", errors.map((e) => e.message).join(", "));
+      console.error("[USAGE] ❌ Erreur création usage record:", errors.map((e) => e.message).join(", "));
     } else {
       await prisma.$transaction([
         prisma.usageBillingState.update({
@@ -387,8 +441,8 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
         }),
       ]);
       console.log(
-        "[USAGE] 💸 billed delta €",
-        toBill,
+        "[USAGE] ✅ Facturation réussie: €",
+        toBill.toFixed(2),
         "tier",
         state.billedTier,
         "->",
@@ -396,7 +450,7 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
       );
     }
   } catch (e) {
-    console.error("bill delta error:", e);
+    console.error("[USAGE] ❌ Erreur facturation:", e);
   } finally {
     await releaseLock(shop, periodKey, lock.token);
   }
@@ -405,6 +459,80 @@ export async function processMonthlyUsage(admin, shop, existingUsage) {
     where: { id: usage.id },
   });
   return { ...updatedUsage, orderCount };
+}
+
+/* ------------------------ Helper: Count Orders ------------------------ */
+/**
+ * Compte les commandes sur une période donnée
+ */
+async function countOrdersForCycle(admin, cycleStart, cycleEnd) {
+  let orderCount = 0;
+  try {
+    const startDate = cycleStart.toISOString();
+    const endDate = cycleEnd.toISOString();
+
+    // ✅ Syntaxe optimisée pour éviter les variations entre shops
+    const queryString = `created_at:>=${startDate} created_at:<=${endDate} test:false -status:cancelled (financial_status:paid OR financial_status:partially_paid)`;
+
+    const response = await admin.graphql(
+      `#graphql
+        query OrdersCount($query: String!) {
+          orders(first: 250, query: $query) {
+            edges { node { id createdAt } cursor }
+            pageInfo { hasNextPage }
+          }
+        }`,
+      { variables: { query: queryString } }
+    );
+    const json = await response.json();
+
+    // ✅ Vérifier les erreurs GraphQL
+    if (json?.errors) {
+      throw new Error(`GraphQL errors: ${json.errors.map(e => e.message).join(", ")}`);
+    }
+
+    if (json?.data?.orders) {
+      const edges = json.data.orders.edges || [];
+      orderCount = edges.length;
+
+      let hasNextPage = json.data.orders.pageInfo?.hasNextPage;
+      let lastCursor = edges.length > 0 ? edges[edges.length - 1].cursor : null;
+      
+      while (hasNextPage && lastCursor) {
+        const nextResponse = await admin.graphql(
+          `#graphql
+            query OrdersNext($query: String!, $cursor: String!) {
+              orders(first: 250, after: $cursor, query: $query) {
+                edges { node { id } cursor }
+                pageInfo { hasNextPage }
+              }
+            }`,
+          { variables: { query: queryString, cursor: lastCursor } }
+        );
+        const nextJson = await nextResponse.json();
+        
+        // ✅ Vérifier les erreurs GraphQL dans la pagination
+        if (nextJson?.errors) {
+          console.error("[USAGE] ⚠️ Erreur GraphQL pagination:", nextJson.errors);
+          break; // Arrêter la pagination mais garder ce qu'on a
+        }
+        
+        const nextEdges = nextJson?.data?.orders?.edges || [];
+        orderCount += nextEdges.length;
+        hasNextPage = nextJson?.data?.orders?.pageInfo?.hasNextPage;
+        lastCursor =
+          nextEdges.length > 0 ? nextEdges[nextEdges.length - 1].cursor : null;
+      }
+    } else if (json?.errors) {
+      throw new Error(json.errors.map((e) => e.message).join(", "));
+    } else {
+      throw new Error("Réponse GraphQL inattendue (orders)");
+    }
+  } catch (error) {
+    console.error("[USAGE] ❌ Erreur comptage automatique:", error.message);
+    orderCount = 0;
+  }
+  return orderCount;
 }
 
 /* ------------------------ ensureActiveSubscription ------------------------ */
@@ -449,7 +577,7 @@ export async function ensureActiveSubscription(admin, shop) {
         data: { status: "CANCELLED", confirmationUrl: null },
       });
 
-      // ✅ CORRECTION : Toujours compter pour l'UI ; processMonthlyUsage ne facture pas si essai
+      // ✅ Toujours appeler processMonthlyUsage (il gère l'essai en interne)
       const dbUsage = await prisma.usageSubscription.findFirst({
         where: { shop, subscriptionId: activeShopify.id },
       });
@@ -457,7 +585,7 @@ export async function ensureActiveSubscription(admin, shop) {
       return { active: true, orderCount: resProcess?.orderCount ?? null };
     }
   } catch (err) {
-    console.error("Erreur check live subscription Shopify:", err);
+    console.error("[SUBSCRIPTION] ❌ Erreur check live subscription Shopify:", err);
   }
 
   // Pas d'actif → gérer PENDING existant puis sinon créer la souscription usage-only
@@ -501,7 +629,7 @@ export async function ensureActiveSubscription(admin, shop) {
         const subDetails = detailsJson?.data?.node;
         const stillInTrial = subDetails ? isInTrial(subDetails) : false;
         
-        // ✅ Trouver le lineItemId d'usage (au cas où il aurait changé entre PENDING et ACTIVE)
+        // ✅ Trouver le lineItemId d'usage
         const usageItem = subDetails?.lineItems?.find(
           (li) => li.plan?.pricingDetails?.__typename === "AppUsagePricing"
         );
@@ -512,15 +640,15 @@ export async function ensureActiveSubscription(admin, shop) {
           data: { 
             status: "ACTIVE", 
             confirmationUrl: null,
-            lineItemId: freshLineItemId, // ✅ Rafraîchir au cas où changé
-            trialConsumed: !stillInTrial, // ✅ Marque comme consommé si plus en essai
+            lineItemId: freshLineItemId,
+            trialConsumed: !stillInTrial,
           },
         });
         await prisma.usageSubscription.updateMany({
           where: { shop, id: { not: pending.id } },
           data: { status: "CANCELLED", confirmationUrl: null },
         });
-        // ✅ CORRECTION : Appel systématique même pendant l'essai
+        
         const resProcess = await processMonthlyUsage(admin, shop, pending);
         return { active: true, orderCount: resProcess?.orderCount ?? null };
       }
@@ -528,7 +656,7 @@ export async function ensureActiveSubscription(admin, shop) {
         return { confirmationUrl: pending.confirmationUrl };
       }
     } catch (err) {
-      console.error("Erreur vérification abonnement:", err);
+      console.error("[SUBSCRIPTION] ❌ Erreur vérification abonnement:", err);
     }
 
     // Nettoyage PENDING obsolète
@@ -538,13 +666,13 @@ export async function ensureActiveSubscription(admin, shop) {
     });
   }
 
-  // ✅ CORRECTION MAJEURE : Vérifier si la boutique a déjà consommé son essai
+  // ✅ Vérifier si la boutique a déjà consommé son essai
   const alreadyConsumed = await hasConsumedTrial(shop);
   const trialDays = alreadyConsumed ? 0 : 7; // Essai uniquement si jamais consommé
   
   console.log(`[SUBSCRIPTION] Création nouvel abonnement - Essai: ${trialDays} jours ${alreadyConsumed ? '(déjà consommé)' : '(nouveau client)'}`);
 
-  // Créer une SOUSCRIPTION usage-only (cap 39,90€, essai 7 jours UNIQUEMENT si jamais consommé)
+  // Créer une SOUSCRIPTION usage-only (cap 39,90€)
   try {
     const returnUrl = `https://${shop}/admin/apps/${process.env.SHOPIFY_API_KEY}`;
     const result = await admin.graphql(
@@ -559,7 +687,7 @@ export async function ensureActiveSubscription(admin, shop) {
               plan: {
                 appUsagePricingDetails: {
                   cappedAmount: { amount: 39.90, currencyCode: EUR }
-                  terms: "0–30: 0€ • 31–300: 19,90€ • >300: 39,90€"
+                  terms: "0-30: 0€ • 31-300: 19,90€ • >300: 39,90€"
                 }
               }
             }
@@ -581,6 +709,7 @@ export async function ensureActiveSubscription(admin, shop) {
     const payload = data?.data?.appSubscriptionCreate;
 
     if (payload?.userErrors?.length) {
+      console.error("[SUBSCRIPTION] ❌ Erreur création:", payload.userErrors);
       return { error: payload.userErrors.map((e) => e.message).join(", ") };
     }
 
@@ -600,9 +729,10 @@ export async function ensureActiveSubscription(admin, shop) {
       },
     });
 
+    console.log("[SUBSCRIPTION] ✅ Abonnement créé, redirection vers:", payload.confirmationUrl);
     return { confirmationUrl: payload.confirmationUrl };
   } catch (createErr) {
-    console.error("Erreur création abonnement:", createErr);
+    console.error("[SUBSCRIPTION] ❌ Erreur création abonnement:", createErr);
     return { error: "Impossible de créer l'abonnement." };
   }
 }
