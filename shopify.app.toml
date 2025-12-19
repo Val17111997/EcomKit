@@ -27,15 +27,29 @@ topic = "ORDERS_CREATE"
 path = "/webhooks"
 delivery_method = "http"
 
+# Webhooks GDPR obligatoires
+[webhooks.customers_data_request]
+topic = "CUSTOMERS_DATA_REQUEST"
+path = "/webhooks/customers/data_request"
+delivery_method = "http"
+
+[webhooks.customers_redact]
+topic = "CUSTOMERS_REDACT"
+path = "/webhooks/customers/redact"
+delivery_method = "http"
+
+[webhooks.shop_redact]
+topic = "SHOP_REDACT"
+path = "/webhooks/shop/redact"
+delivery_method = "http"
+
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "write_products,read_products,read_orders,read_customers,write_payment_terms"
 
 [auth]
 redirect_urls = [
-  "https://ecomkit.fly.dev/webhooks/customers/data_request",
-  "https://ecomkit.fly.dev/webhooks/customers/redact",
-  "https://ecomkit.fly.dev/webhooks/shop/redact"
+  "https://ecomkit.fly.dev/auth/callback",
+  "https://ecomkit.fly.dev/auth/shopify/callback"
 ]
 
 [pos]
